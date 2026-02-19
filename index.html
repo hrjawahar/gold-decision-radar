@@ -273,43 +273,63 @@
   }
 
   async function autoFetch(){
-    $("status").textContent="Status: fetching…";
-    try{
-      const res=await fetch("/api/market", {cache:"no-store"});
-      if(!res.ok) throw new Error(res.status);
-      const data=await res.json();
-      if (Number.isFinite(data.usdInr)) {
-  const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
+  $("status").textContent = "Status: fetching…";
+  try{
+    const res = await fetch("/api/market", { cache: "no-store" });
+    if(!res.ok) throw new Error(res.status);
+    const data = await res.json();
 
-  let arrow = "→";
-  let cls = "inr-flat";
-  if (pct !== null) {
-    if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
-    else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
-  }
+    // --- Fill numeric fields ---
+    if (Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
+    if (Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
 
-  const pctText = (pct === null)
-    ? ""
-    : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
+    // --- Set INR trend dropdown (auto) ---
+    if (data.usdInrTrend) $("inrTrend").value = data.usdInrTrend;
 
-  const el = document.getElementById("usdInrSpot");
-  if (el) {
-    el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
-    el.classList.remove("inr-up","inr-down","inr-flat");
-    el.classList.add(cls);
+    // --- USD/INR spot + 30d % display + color ---
+    if (Number.isFinite(data.usdInr)) {
+      const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
+
+      let arrow = "→";
+      let cls = "inr-flat";
+      if (pct !== null) {
+        if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
+        else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
+      }
+
+      const pctText = (pct === null)
+        ? ""
+        : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
+
+      const el = document.getElementById("usdInrSpot");
+      if (el) {
+        el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
+        el.classList.remove("inr-up","inr-down","inr-flat");
+        el.classList.add(cls);
+      }
+    }
+
+    // --- Meta pills ---
+    $("asOf").textContent = `As of: ${data.asOf || "—"}`;
+    $("fresh").textContent = (function formatSources(f){
+      const parts = [];
+      if (f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
+      if (f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
+      if (f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
+      return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
+    })(data.freshness);
+
+    $("status").textContent = "Status: fetched ✓";
+
+    // --- Recompute decision + save ---
+    compute();
+    save();
+
+  } catch(e) {
+    $("status").textContent = "Status: fetch failed (manual works)";
+    compute();
   }
 }
-
-      $("asOf").textContent=`As of: ${data.asOf||"—"}`;
-      $("fresh").textContent=formatSources(data.freshness);
-      $("status").textContent="Status: fetched ✓";
-      compute();
-      save();
-    }catch(e){
-      $("status").textContent="Status: fetch failed (manual works)";
-      compute();
-    }
-  }
 
   ["dxy","realYield","fedTone","geoRisk","inrTrend"].forEach(id=>{
     $(id).addEventListener("input", compute);
