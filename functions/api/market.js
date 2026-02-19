@@ -2,10 +2,11 @@ export async function onRequestGet() {
   const cacheSeconds = 300;
 
   try {
-    const [dxyObj, inrObj, realYieldObj] = await Promise.all([
+    const [dxyObj, inrObj, realYieldObj, rsiObj] = await Promise.all([
       getDxy(),
       getUsdInr(),
-      getRealYield()
+      getRealYield(),
+      getRsi14("SETFGOLD.NS") // RSI(14) for SETFGOLD
     ]);
 
     const pct30d = inrObj.pct30d;
@@ -23,11 +24,14 @@ export async function onRequestGet() {
       usdInr: inrObj.value,
       usdInrChangePct30d: pct30d,
       usdInrTrend,
+      rsi14Setfgold: rsiObj?.value ?? null,
+      rsi14SetfgoldAsOf: rsiObj?.asOf ?? null,
       asOf,
       freshness: {
         dxy: dxyObj.source,
         usdInr: inrObj.source,
-        realYield: realYieldObj.source
+        realYield: realYieldObj.source,
+        rsi: rsiObj?.source || { provider: "yahoo", symbol: "SETFGOLD.NS", window: "3mo", interval: "1d" }
       },
       sources: {
         yahoo: "https://query1.finance.yahoo.com/v8/finance/chart/",
@@ -51,6 +55,8 @@ export async function onRequestGet() {
   }
 }
 
+/* -------------------- existing factors -------------------- */
+
 async function getDxy() {
   try {
     const y = await fetchYahooChart("DX-Y.NYB");
@@ -73,6 +79,63 @@ async function getRealYield() {
   const v = await fetchFredLastValue("DFII10");
   return { value: v, source: { provider: "fred", series: "DFII10" } };
 }
+
+/* -------------------- RSI(14) for SETFGOLD -------------------- */
+
+async function getRsi14(symbol) {
+  const source = { provider: "yahoo", symbol, window: "3mo", interval: "1d" };
+  const data = await fetchYahooCloses(symbol, "3mo", "1d");
+  const rsi = computeRsi14(data.closes);
+  return { value: rsi, asOf: data.asOf, source };
+}
+
+async function fetchYahooCloses(symbol, range = "3mo", interval = "1d") {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
+  const res = await fetch(url, { headers: { "user-agent": "Mozilla/5.0", "accept": "application/json,text/plain,*/*" } });
+  if (!res.ok) throw new Error(`Yahoo fetch failed for ${symbol}: HTTP ${res.status}`);
+  const j = await res.json();
+  const result = j?.chart?.result?.[0];
+  if (!result) throw new Error(`Yahoo parse failed for ${symbol}`);
+
+  const closesRaw = result?.indicators?.quote?.[0]?.close || [];
+  const closes = closesRaw.filter(x => typeof x === "number" && Number.isFinite(x));
+  if (closes.length < 20) throw new Error(`Not enough close data for RSI(14): ${symbol}`);
+
+  const meta = result.meta || {};
+  const asOf = meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000).toISOString() : new Date().toISOString();
+  return { closes, asOf };
+}
+
+// Wilder RSI(14)
+function computeRsi14(closes) {
+  const period = 14;
+  if (!Array.isArray(closes) || closes.length < period + 1) return null;
+
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change >= 0) gains += change;
+    else losses += Math.abs(change);
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+    const gain = change > 0 ? change : 0;
+    const loss = change < 0 ? Math.abs(change) : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  return Math.round(rsi * 10) / 10; // 1 decimal
+}
+
+/* -------------------- existing helpers -------------------- */
 
 async function fetchYahooChart(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1d`;
