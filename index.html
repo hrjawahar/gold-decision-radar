@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Gold Decision Radar v3.1</title>
+  <meta name="description" content="Auto-fetch DXY, US 10Y Real Yield, USD/INR 30-day trend. Installable on iPhone as a Home Screen app." />
+  <meta name="theme-color" content="#0b0f14" />
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    :root{--bg:#0b0f14;--card:#111827;--muted:#94a3b8;--text:#e5e7eb;--line:#1f2937;--good:#22c55e;--mid:#f59e0b;--bad:#ef4444;--radius:16px;--shadow:0 12px 30px rgba(0,0,0,.35);--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;--sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans","Liberation Sans",sans-serif;}
+    *{box-sizing:border-box}
+    body{margin:0;padding:18px;padding-top:max(18px,env(safe-area-inset-top));padding-bottom:max(18px,env(safe-area-inset-bottom));
+      background:radial-gradient(1000px 500px at 10% -10%, rgba(96,165,250,.18), transparent 60%),
+                 radial-gradient(900px 450px at 110% 10%, rgba(34,197,94,.14), transparent 60%),var(--bg);
+      color:var(--text);font-family:var(--sans);line-height:1.35}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+    h1{font-size:20px;margin:0 0 4px 0;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:13px;margin:0}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
+    @media (max-width:860px){.grid{grid-template-columns:1fr}}
+    .inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:520px){.inputs{grid-template-columns:1fr}}
+    .field{background:rgba(15,23,42,.45);border:1px solid rgba(148,163,184,.18);border-radius:14px;padding:12px}
+    .label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-bottom:8px}
+    .label b{color:var(--text);font-weight:600}
+    input[type="number"],select{width:100%;border-radius:12px;border:1px solid rgba(148,163,184,.24);background:rgba(2,6,23,.55);color:var(--text);padding:12px;font-size:15px;outline:none}
+    input[type="number"]:focus,select:focus{border-color:rgba(96,165,250,.7);box-shadow:0 0 0 4px rgba(96,165,250,.18)}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px}
+    .panel{display:flex;flex-direction:column;gap:12px}
+    .result{border-radius:18px;padding:16px;border:1px solid rgba(148,163,184,.18);background:rgba(2,6,23,.35)}
+    .badge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;font-size:12px;border:1px solid rgba(148,163,184,.22);background:rgba(15,23,42,.55)}
+    .badge.good{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.12)}
+    .badge.mid{border-color:rgba(245,158,11,.55);background:rgba(245,158,11,.12)}
+    .badge.bad{border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.12)}
+    .big{font-size:22px;margin:10px 0 6px 0;font-weight:800;letter-spacing:.2px}
+    .meta{color:var(--muted);font-size:13px;margin:0}
+    .scoreline{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .chip{background:rgba(15,23,42,.75);border:1px solid rgba(148,163,184,.16);border-radius:999px;padding:8px 10px;font-size:12px;color:var(--text)}
+    .chip code{font-family:var(--mono);font-size:12px;color:#cbd5e1}
+    .actions{display:flex;flex-wrap:wrap;gap:10px}
+    button{border:1px solid rgba(148,163,184,.22);background:rgba(15,23,42,.65);color:var(--text);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:650;cursor:pointer}
+    button.primary{border-color:rgba(96,165,250,.55);background:rgba(96,165,250,.12)}
+    button.danger{border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.10)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.16);background:rgba(2,6,23,.25);font-size:12px}
+    details{border:1px solid rgba(148,163,184,.16);background:rgba(2,6,23,.25);border-radius:14px;padding:12px}
+    summary{cursor:pointer;font-weight:650}
+    footer{margin-top:14px;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Gold Decision Radar v3.1</h1>
+      <p class="sub"><b>Auto-fetch</b> DXY + Real Yield + USD/INR <b>30-day</b> trend. Install to Home Screen for app-like use.</p>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnRefresh">Auto-Fetch Now</button>
+      <button class="primary" id="btnSave">Save</button>
+      <button id="btnShare">Share</button>
+      <button class="danger" id="btnReset">Reset</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <div class="row" style="margin-bottom:12px;">
+        <span class="pill" id="status">Status: ready</span>
+        <span class="pill" id="asOf">As of: —</span>
+        <span class="pill" id="fresh">Sources: —</span>
+      </div>
+
+      <div class="inputs">
+        <div class="field">
+          <div class="label"><b>DXY</b><span id="dxyScore" class="pill">Score: 0</span></div>
+          <input type="number" id="dxy" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
+          <div class="hint">Rule: &lt;102 = +1, 102–105 = 0, &gt;105 = −1</div>
+        </div>
+
+        <div class="field">
+          <div class="label"><b>US 10Y Real Yield (%)</b><span id="ryScore" class="pill">Score: 0</span></div>
+          <input type="number" id="realYield" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
+          <div class="hint">Rule: &lt;1.3 = +1, 1.3–1.7 = 0, &gt;1.7 = −1</div>
+        </div>
+
+        <div class="field">
+          <div class="label"><b>Fed Tone (last 30 days)</b><span id="fedScore" class="pill">Score: 0</span></div>
+          <select id="fedTone">
+            <option value="cuts_likely">Rate cuts likely / dovish</option>
+            <option value="neutral" selected>Neutral / mixed</option>
+            <option value="hawkish">Cuts delayed / hawkish</option>
+          </select>
+          <div class="hint">Rule: Dovish +1, Neutral 0, Hawkish −1</div>
+        </div>
+
+        <div class="field">
+          <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Score: 0</span></div>
+          <select id="geoRisk">
+            <option value="crisis">War / crisis escalating</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fading">Risk fading / calming</option>
+          </select>
+          <div class="hint">Rule: Crisis +1, Normal 0, Fading −1</div>
+        </div>
+
+        <div class="field" style="grid-column: 1 / -1;">
+          <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span></div>
+          <select id="inrTrend">
+            <option value="weakening">INR weakening (USD/INR rising) → supports gold</option>
+            <option value="stable" selected>Stable / range-bound</option>
+            <option value="strengthening">INR strengthening (USD/INR falling) → hurts gold</option>
+          </select>
+          <div class="hint">Auto-selected using ~30-day % change. You can override.</div>
+        </div>
+      </div>
+
+      <details style="margin-top:12px;">
+        <summary>Install on iPhone</summary>
+        <div class="hint" style="margin-top:8px;">
+          iOS requires a hosted URL once. After that it’s a Home Screen app:
+          <ol>
+            <li>Deploy this project on Cloudflare Pages.</li>
+            <li>Open the URL in <b>Safari</b> on your i16.</li>
+            <li>Share → <b>Add to Home Screen</b>.</li>
+          </ol>
+        </div>
+      </details>
+    </section>
+
+    <aside class="card panel">
+      <div class="result" aria-live="polite">
+        <span class="badge mid" id="badge">HOLD</span>
+        <div class="big" id="headline">Score: 0.0 → HOLD / SIP LIGHT</div>
+        <p class="meta" id="explain">Auto-fetch or update inputs.</p>
+        <div class="scoreline" id="chips"></div>
+      </div>
+
+      <details>
+        <summary>Decision logic</summary>
+        <div class="hint" style="margin-top:8px;">
+          Score ≥ +2 → BUY • −1 to +1 → HOLD • ≤ −2 → TRIM
+        </div>
+      </details>
+    </aside>
+  </div>
+
+  <footer>Offline: app shell cached. If network is down, it uses last saved values.</footer>
+</div>
+
+<script>
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+
+  const $ = (id) => document.getElementById(id);
+  const storageKey = "goldDecisionRadar:v31";
+
+  const round1 = (x)=> Math.round(x*10)/10;
+  const toNum = (v)=> { const n=parseFloat(v); return Number.isFinite(n)?n:null; };
+
+  const scoreDXY = (v)=> v==null?0:(v<102?1:(v<=105?0:-1));
+  const scoreRY  = (v)=> v==null?0:(v<1.30?1:(v<=1.70?0:-1));
+  const scoreFed = (t)=> t==="cuts_likely"?1:(t==="hawkish"?-1:0);
+  const scoreGeo = (g)=> g==="crisis"?1:(g==="fading"?-1:0);
+  const scoreINR = (t)=> t==="weakening"?0.5:(t==="strengthening"?-0.5:0);
+
+  function compute(){
+    const dxy=toNum($("dxy").value), ry=toNum($("realYield").value);
+    const fed=$("fedTone").value, geo=$("geoRisk").value, inr=$("inrTrend").value;
+
+    const s1=scoreDXY(dxy), s2=scoreRY(ry), s3=scoreFed(fed), s4=scoreGeo(geo), s5=scoreINR(inr);
+    const total=round1(s1+s2+s3+s4+s5);
+
+    $("dxyScore").textContent=`Score: ${s1}`;
+    $("ryScore").textContent=`Score: ${s2}`;
+    $("fedScore").textContent=`Score: ${s3}`;
+    $("geoScore").textContent=`Score: ${s4}`;
+    $("inrScore").textContent=`Score: ${s5}`;
+
+    let action="HOLD", label="HOLD / SIP LIGHT", cls="mid", exp="Sideways zone.";
+    if (total>=2){ action="BUY"; label="BUY / ACCUMULATE"; cls="good"; exp="Macro supports gold."; }
+    else if (total<=-2){ action="TRIM"; label="TRIM / EXIT / WAIT"; cls="bad"; exp="High correction risk."; }
+
+    $("badge").textContent=action;
+    $("badge").className=`badge ${cls}`;
+    $("headline").textContent=`Score: ${total.toFixed(1)} → ${label}`;
+    $("explain").textContent=exp;
+
+    const chips=[
+      ["DXY", $("dxy").value||"—", s1],
+      ["RealYield", $("realYield").value||"—", s2],
+      ["Fed", fed.replaceAll("_"," "), s3],
+      ["Geo", geo, s4],
+      ["USD/INR", inr, s5]
+    ];
+    const box=$("chips"); box.innerHTML="";
+    chips.forEach(([n,v,s])=>{
+      const el=document.createElement("div");
+      el.className="chip";
+      el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
+      box.appendChild(el);
+    });
+
+    return {total,label,s1,s2,s3,s4,s5};
+  }
+
+  function save(){
+    const payload={
+      dxy:$("dxy").value, realYield:$("realYield").value,
+      fedTone:$("fedTone").value, geoRisk:$("geoRisk").value, inrTrend:$("inrTrend").value,
+      asOf:$("asOf").textContent, fresh:$("fresh").textContent,
+      lastSavedISO:new Date().toISOString()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(payload));
+    $("btnSave").textContent="Saved ✓";
+    setTimeout(()=> $("btnSave").textContent="Save", 900);
+  }
+
+  function load(){
+    try{
+      const raw=localStorage.getItem(storageKey);
+      if(!raw) return false;
+      const d=JSON.parse(raw);
+      if(d.dxy!=null) $("dxy").value=d.dxy;
+      if(d.realYield!=null) $("realYield").value=d.realYield;
+      if(d.fedTone) $("fedTone").value=d.fedTone;
+      if(d.geoRisk) $("geoRisk").value=d.geoRisk;
+      if(d.inrTrend) $("inrTrend").value=d.inrTrend;
+      if(d.asOf) $("asOf").textContent=d.asOf;
+      if(d.fresh) $("fresh").textContent=d.fresh;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  function resetAll(){
+    localStorage.removeItem(storageKey);
+    $("dxy").value=""; $("realYield").value="";
+    $("fedTone").value="neutral"; $("geoRisk").value="normal"; $("inrTrend").value="stable";
+    $("asOf").textContent="As of: —"; $("fresh").textContent="Sources: —";
+    $("status").textContent="Status: ready";
+    compute();
+  }
+
+  async function share(){
+    const r=compute();
+    const text=`Gold Radar v3.1\nScore: ${r.total.toFixed(1)} → ${r.label}`;
+    try{
+      if(navigator.share) await navigator.share({title:"Gold Radar", text});
+      else { await navigator.clipboard.writeText(text); alert("Copied."); }
+    }catch(e){}
+  }
+
+  function formatSources(f){
+    const parts=[];
+    if(f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
+    if(f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
+    if(f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
+    return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
+  }
+
+  async function autoFetch(){
+    $("status").textContent="Status: fetching…";
+    try{
+      const res=await fetch("/api/market", {cache:"no-store"});
+      if(!res.ok) throw new Error(res.status);
+      const data=await res.json();
+      if(Number.isFinite(data.dxy)) $("dxy").value=data.dxy.toFixed(2);
+      if(Number.isFinite(data.realYield)) $("realYield").value=data.realYield.toFixed(2);
+      if(data.usdInrTrend) $("inrTrend").value=data.usdInrTrend;
+      $("asOf").textContent=`As of: ${data.asOf||"—"}`;
+      $("fresh").textContent=formatSources(data.freshness);
+      $("status").textContent="Status: fetched ✓";
+      compute();
+      save();
+    }catch(e){
+      $("status").textContent="Status: fetch failed (manual works)";
+      compute();
+    }
+  }
+
+  ["dxy","realYield","fedTone","geoRisk","inrTrend"].forEach(id=>{
+    $(id).addEventListener("input", compute);
+    $(id).addEventListener("change", compute);
+  });
+  $("btnSave").addEventListener("click", save);
+  $("btnReset").addEventListener("click", ()=>{ if(confirm("Reset all values?")) resetAll(); });
+  $("btnShare").addEventListener("click", share);
+  $("btnRefresh").addEventListener("click", autoFetch);
+
+  const hadSaved=load();
+  compute();
+  if(!hadSaved) autoFetch();
+</script>
+</body>
+</html>
