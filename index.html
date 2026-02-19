@@ -85,6 +85,11 @@
      <div class="row" style="margin-bottom:12px;">
         <span class="pill" id="usdInrSpot">USD/INR Spot: —</span>
 </div>
+      <div class="field" style="grid-column: 1 / -1;">
+  <div class="label"><b>RSI (14) – SETFGOLD</b><span id="rsiScore" class="pill">Score: 0</span></div>
+  <input type="number" id="rsi14" step="0.1" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
+  <div class="hint">Rule: RSI &lt;30 = +1 (oversold), 30–70 = 0, &gt;70 = −1 (overbought)</div>
+</div>
 
       <div class="inputs">
         <div class="field">
@@ -181,6 +186,11 @@
   function compute(){
     const dxy=toNum($("dxy").value), ry=toNum($("realYield").value);
     const fed=$("fedTone").value, geo=$("geoRisk").value, inr=$("inrTrend").value;
+    const rsi = toNum($("rsi14").value);
+    const s6 = scoreRSI(rsi);
+    const total = round1(s1 + s2 + s3 + s4 + s5 + s6);
+    $("rsiScore").textContent = `Score: ${s6}`;
+
 
     const s1=scoreDXY(dxy), s2=scoreRY(ry), s3=scoreFed(fed), s4=scoreGeo(geo), s5=scoreINR(inr);
     const total=round1(s1+s2+s3+s4+s5);
@@ -201,12 +211,15 @@
     $("explain").textContent=exp;
 
     const chips=[
-      ["DXY", $("dxy").value||"—", s1],
-      ["RealYield", $("realYield").value||"—", s2],
-      ["Fed", fed.replaceAll("_"," "), s3],
-      ["Geo", geo, s4],
-      ["USD/INR", inr, s5]
-    ];
+      const chips=[
+  ["DXY", $("dxy").value||"—", s1],
+  ["RealYield", $("realYield").value||"—", s2],
+  ["Fed", fed.replaceAll("_"," "), s3],
+  ["Geo", geo, s4],
+  ["USD/INR", inr, s5],
+  ["RSI14", $("rsi14").value||"—", s6]
+];
+
     const box=$("chips"); box.innerHTML="";
     chips.forEach(([n,v,s])=>{
       const el=document.createElement("div");
@@ -278,6 +291,8 @@
     const res = await fetch("/api/market", { cache: "no-store" });
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
+    if (Number.isFinite(data.rsi14Setfgold)) $("rsi14").value = data.rsi14Setfgold.toFixed(1);
+
 
     // --- Fill numeric fields ---
     if (Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
@@ -331,10 +346,11 @@
   }
 }
 
-  ["dxy","realYield","fedTone","geoRisk","inrTrend"].forEach(id=>{
-    $(id).addEventListener("input", compute);
-    $(id).addEventListener("change", compute);
-  });
+  ["dxy","realYield","fedTone","geoRisk","inrTrend","rsi14"].forEach(id=>{
+  $(id).addEventListener("input", compute);
+  $(id).addEventListener("change", compute);
+});
+
   $("btnSave").addEventListener("click", save);
   $("btnReset").addEventListener("click", ()=>{ if(confirm("Reset all values?")) resetAll(); });
   $("btnShare").addEventListener("click", share);
