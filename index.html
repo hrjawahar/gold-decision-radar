@@ -77,6 +77,10 @@
         <span class="pill" id="fresh">Sources: —</span>
       </div>
 
+     <div class="row" style="margin-bottom:12px;">
+        <span class="pill" id="usdInrSpot">USD/INR Spot: —</span>
+</div>
+
       <div class="inputs">
         <div class="field">
           <div class="label"><b>DXY</b><span id="dxyScore" class="pill">Score: 0</span></div>
@@ -272,6 +276,9 @@
       if(Number.isFinite(data.dxy)) $("dxy").value=data.dxy.toFixed(2);
       if(Number.isFinite(data.realYield)) $("realYield").value=data.realYield.toFixed(2);
       if(data.usdInrTrend) $("inrTrend").value=data.usdInrTrend;
+      if(Number.isFinite(data.usdInr)) {
+  $("usdInrSpot").textContent = "USD/INR Spot: " + data.usdInr.toFixed(2);
+}
       $("asOf").textContent=`As of: ${data.asOf||"—"}`;
       $("fresh").textContent=formatSources(data.freshness);
       $("status").textContent="Status: fetched ✓";
@@ -298,4 +305,3 @@
 </script>
 </body>
 </html>
-
