@@ -53,18 +53,9 @@
     summary{cursor:pointer;font-weight:650}
     footer{margin-top:14px;color:var(--muted);font-size:12px}
     <style>
-.inr-up{
-  border-color: rgba(239,68,68,.35) !important;
-  color: rgba(254,202,202,1) !important;
-}
-.inr-down{
-  border-color: rgba(34,197,94,.35) !important;
-  color: rgba(187,247,208,1) !important;
-}
-.inr-flat{
-  border-color: rgba(245,158,11,.35) !important;
-  color: rgba(253,230,138,1) !important;
-}
+.pill.inr-up  { border-color: rgba(239,68,68,.65) !important; color: rgba(254,202,202,1) !important; }
+.pill.inr-down{ border-color: rgba(34,197,94,.65) !important; color: rgba(187,247,208,1) !important; }
+.pill.inr-flat{ border-color: rgba(245,158,11,.65) !important; color: rgba(253,230,138,1) !important; }
 </style>
 
 </head>
@@ -287,12 +278,28 @@
       const res=await fetch("/api/market", {cache:"no-store"});
       if(!res.ok) throw new Error(res.status);
       const data=await res.json();
-      if(Number.isFinite(data.dxy)) $("dxy").value=data.dxy.toFixed(2);
-      if(Number.isFinite(data.realYield)) $("realYield").value=data.realYield.toFixed(2);
-      if(data.usdInrTrend) $("inrTrend").value=data.usdInrTrend;
-      if(Number.isFinite(data.usdInr)) {
-  $("usdInrSpot").textContent = "USD/INR Spot: " + data.usdInr.toFixed(2);
+      if (Number.isFinite(data.usdInr)) {
+  const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
+
+  let arrow = "→";
+  let cls = "inr-flat";
+  if (pct !== null) {
+    if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
+    else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
+  }
+
+  const pctText = (pct === null)
+    ? ""
+    : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
+
+  const el = document.getElementById("usdInrSpot");
+  if (el) {
+    el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
+    el.classList.remove("inr-up","inr-down","inr-flat");
+    el.classList.add(cls);
+  }
 }
+
       $("asOf").textContent=`As of: ${data.asOf||"—"}`;
       $("fresh").textContent=formatSources(data.freshness);
       $("status").textContent="Status: fetched ✓";
