@@ -72,17 +72,35 @@ async function getDxy() {
 }
 
 async function getUsdInr() {
+  // helper to convert pct to trend buckets
+  const pctToTrend = (pct) => {
+    let trend = "stable";
+    if (typeof pct === "number" && Number.isFinite(pct)) {
+      if (pct > 0.5) trend = "weakening";         // USD/INR rising
+      else if (pct < -0.5) trend = "strengthening"; // USD/INR falling
+    }
+    return trend;
+  };
+
   try {
     const y = await fetchYahooChart("INR=X");
-    if (Number.isFinite(y.latestPrice)) return { value: y.latestPrice, pct30d: y.pctChangeFromFirstPoint, source: { provider: "yahoo", symbol: "INR=X", window: "1mo" } };
+    const pct30d = y.pctChangeFromFirstPoint;
+    return {
+      value: Number.isFinite(y.latestPrice) ? y.latestPrice : null,
+      pct30d: (typeof pct30d === "number" && Number.isFinite(pct30d)) ? pct30d : null,
+      trend: pctToTrend(pct30d),
+      source: { provider: "yahoo", symbol: "INR=X", window: "1mo" }
+    };
   } catch (e) {}
-  const s = await fetchStooqClose("usdinr", true);
-  return { value: s.last, pct30d: s.pct30d, source: { provider: "stooq", symbol: "usdinr", window: "30d" } };
-}
 
-async function getRealYield() {
-  const v = await fetchFredLastValue("DFII10");
-  return { value: v, source: { provider: "fred", series: "DFII10" } };
+  // fallback to Stooq
+  const s = await fetchStooqClose("usdinr", true);
+  return {
+    value: Number.isFinite(s.last) ? s.last : null,
+    pct30d: (typeof s.pct30d === "number" && Number.isFinite(s.pct30d)) ? s.pct30d : null,
+    trend: pctToTrend(s.pct30d),
+    source: { provider: "stooq", symbol: "usdinr", window: "30d" }
+  };
 }
 
 /* -------------------- RSI(14) for SETFGOLD -------------------- */
