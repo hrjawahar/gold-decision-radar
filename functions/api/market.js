@@ -2,59 +2,46 @@ export async function onRequestGet() {
   const cacheSeconds = 120;
 
   try {
-    const [dxyObj, inrObj, realYieldObj, rsiObj] = await Promise.all([
-  getDxy(),
-  getUsdInr(),
-  getRealYield(),
-  getRsi14Safe("SETFGOLD.NS")   // <-- safe wrapper
-]);
-const [dxyObj, inrObj, realYieldObj, rsiObj, sbiInavObj] = await Promise.all([
-  getDxy(),
-  getUsdInr(),
-  getRealYield(),
-  getRsi14Safe("SETFGOLD.NS"),
-  getSbiGoldEtfInavSafe()
-]);
+    const [dxyObj, inrObj, realYieldObj, rsiObj, sbiInavObj] = await Promise.all([
+      getDxy(),
+      getUsdInr(),
+      getRealYield(),
+      getRsi14Safe("SETFGOLD.NS"),
+      getSbiGoldEtfInavSafe()
+    ]);
 
-    const pct30d = inrObj.pct30d;
-    let usdInrTrend = "stable";
-    if (typeof pct30d === "number") {
-      if (pct30d > 0.5) usdInrTrend = "weakening";
-      else if (pct30d < -0.5) usdInrTrend = "strengthening";
-    }
+    const result = {
+      dxy: dxyObj?.value ?? null,
+      realYield: realYieldObj?.value ?? null,
+      usdInr: inrObj?.value ?? null,
+      usdInrChangePct30d: inrObj?.pct30d ?? null,
+      usdInrTrend: inrObj?.trend ?? null,
 
-    const asOf = new Date().toISOString();
-
-    const body = JSON.stringify({
-      dxy: dxyObj.value,
-      realYield: realYieldObj.value,
-      usdInr: inrObj.value,
-      usdInrChangePct30d: pct30d,
-      usdInrTrend,
       rsi14Setfgold: rsiObj?.value ?? null,
       rsi14SetfgoldAsOf: rsiObj?.asOf ?? null,
+
       sbiGoldEtfInav: sbiInavObj?.value ?? null,
       sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
-      asOf,
+
+      asOf: new Date().toISOString(),
+
       freshness: {
-        dxy: dxyObj.source,
-        usdInr: inrObj.source,
-        realYield: realYieldObj.source,
-        rsi: rsiObj?.source || { provider: "yahoo", symbol: "SETFGOLD.NS", window: "3mo", interval: "1d" }
+        dxy: dxyObj?.source ?? null,
+        usdInr: inrObj?.source ?? null,
+        realYield: realYieldObj?.source ?? null,
+        rsi: rsiObj?.source ?? null,
+        sbiInav: sbiInavObj?.source ?? null
       },
-      {
-  ...,
-  sbiInav: sbiInavObj?.source
-},
+
       sources: {
         yahoo: "https://query1.finance.yahoo.com/v8/finance/chart/",
         stooq: "https://stooq.com/q/l/",
-        fred: "https://fred.stlouisfed.org/graph/fredgraph.csv"
+        fred: "https://fred.stlouisfed.org/graph/fredgraph.csv",
         sbimf: "https://etf.sbimf.com/home/GetETFNAVDetailsAsync"
       }
-    });
+    };
 
-    return new Response(body, {
+    return new Response(JSON.stringify(result), {
       status: 200,
       headers: {
         "content-type": "application/json; charset=utf-8",
@@ -62,8 +49,12 @@ const [dxyObj, inrObj, realYieldObj, rsiObj, sbiInavObj] = await Promise.all([
       }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: "fetch_failed", message: String(err) }), {
-      status: 502,
+    return new Response(JSON.stringify({
+      error: "market_api_failed",
+      message: String(err?.message || err),
+      asOf: new Date().toISOString()
+    }), {
+      status: 500,
       headers: { "content-type": "application/json; charset=utf-8" }
     });
   }
