@@ -291,17 +291,16 @@
     const res = await fetch("/api/market", { cache: "no-store" });
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
+
+    // RSI (SETFGOLD)
     if (Number.isFinite(data.rsi14Setfgold)) $("rsi14").value = data.rsi14Setfgold.toFixed(1);
 
-
-    // --- Fill numeric fields ---
+    // Core factors
     if (Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
     if (Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
-
-    // --- Set INR trend dropdown (auto) ---
     if (data.usdInrTrend) $("inrTrend").value = data.usdInrTrend;
 
-    // --- USD/INR spot + 30d % display + color ---
+    // USD/INR Spot + 30d change display + color
     if (Number.isFinite(data.usdInr)) {
       const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
 
@@ -324,19 +323,15 @@
       }
     }
 
-    // --- Meta pills ---
+    // Meta
     $("asOf").textContent = `As of: ${data.asOf || "—"}`;
-    $("fresh").textContent = (function formatSources(f){
-      const parts = [];
-      if (f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
-      if (f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
-      if (f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
-      return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
-    })(data.freshness);
+
+    // If you have formatSources() function, keep this line; otherwise comment it out
+    if (typeof formatSources === "function") {
+      $("fresh").textContent = formatSources(data.freshness);
+    }
 
     $("status").textContent = "Status: fetched ✓";
-
-    // --- Recompute decision + save ---
     compute();
     save();
 
