@@ -21,6 +21,9 @@ export async function onRequestGet() {
       rsi14SetfgoldAsOf: rsiObj?.asOf ?? null,
       rsi14: rsiObj?.value ?? null,
       rsi14AsOf: rsiObj?.asOf ?? null,
+      rsi14: rsiObj?.value ?? null,
+      rsi14AsOf: rsiObj?.asOf ?? null,
+      rsiSymbol: "SETFGOLD.NS",
 
       sbiGoldEtfInav: sbiInavObj?.value ?? null,
       sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
