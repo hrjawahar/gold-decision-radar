@@ -6,7 +6,7 @@ export async function onRequestGet() {
       getDxy(),
       getUsdInr(),
       getRealYield(),
-      getRsi14Safe("SETFGOLD.NS"),
+      getRsi14Safe("SBIGOLD.NS"),
       getSbiGoldEtfInavSafe()
     ]);
 
@@ -120,10 +120,10 @@ async function getSbiGoldEtfInavSafe() {
     const rows = Array.isArray(j?.Data) ? j.Data : [];
     if (!rows.length) throw new Error("SBI iNAV: empty Data");
 
-    // Find SBI Gold ETF row
-    const row =
-      rows.find(r => /sbi\s*gold\s*etf/i.test(String(r.FundName || ""))) ||
-      rows.find(r => /gold/i.test(String(r.FundName || "")) && /etf/i.test(String(r.FundName || "")));
+    // Find SBI Gold ETF row (exact match first, then fallback)
+const row =
+  rows.find(r => String(r.FundName || "").trim().toLowerCase() === "sbi gold etf") ||
+  rows.find(r => /sbi\s+gold\s+etf/i.test(String(r.FundName || "")));
 
     if (!row) throw new Error("SBI Gold ETF not found in Data");
 
