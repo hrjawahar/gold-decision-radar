@@ -1,5 +1,5 @@
 export async function onRequestGet() {
-  const cacheSeconds = 300;
+  const cacheSeconds = 120;
 
   try {
     const [dxyObj, inrObj, realYieldObj, rsiObj] = await Promise.all([
@@ -7,6 +7,13 @@ export async function onRequestGet() {
   getUsdInr(),
   getRealYield(),
   getRsi14Safe("SETFGOLD.NS")   // <-- safe wrapper
+]);
+const [dxyObj, inrObj, realYieldObj, rsiObj, sbiInavObj] = await Promise.all([
+  getDxy(),
+  getUsdInr(),
+  getRealYield(),
+  getRsi14Safe("SETFGOLD.NS"),
+  getSbiGoldEtfInavSafe()
 ]);
 
     const pct30d = inrObj.pct30d;
@@ -26,6 +33,8 @@ export async function onRequestGet() {
       usdInrTrend,
       rsi14Setfgold: rsiObj?.value ?? null,
       rsi14SetfgoldAsOf: rsiObj?.asOf ?? null,
+      sbiGoldEtfInav: sbiInavObj?.value ?? null,
+      sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
       asOf,
       freshness: {
         dxy: dxyObj.source,
@@ -33,10 +42,15 @@ export async function onRequestGet() {
         realYield: realYieldObj.source,
         rsi: rsiObj?.source || { provider: "yahoo", symbol: "SETFGOLD.NS", window: "3mo", interval: "1d" }
       },
+      {
+  ...,
+  sbiInav: sbiInavObj?.source
+},
       sources: {
         yahoo: "https://query1.finance.yahoo.com/v8/finance/chart/",
         stooq: "https://stooq.com/q/l/",
         fred: "https://fred.stlouisfed.org/graph/fredgraph.csv"
+        sbimf: "https://etf.sbimf.com/home/GetETFNAVDetailsAsync"
       }
     });
 
@@ -104,6 +118,39 @@ async function fetchYahooCloses(symbol, range = "3mo", interval = "1d") {
   const meta = result.meta || {};
   const asOf = meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000).toISOString() : new Date().toISOString();
   return { closes, asOf };
+}
+async function getSbiGoldEtfInavSafe() {
+  try {
+    const url = "https://etf.sbimf.com/home/GetETFNAVDetailsAsync";
+    const res = await fetch(url, { headers: { "accept": "application/json" }});
+    if (!res.ok) throw new Error(`SBI iNAV fetch failed: HTTP ${res.status}`);
+
+    const j = await res.json();
+    const rows = Array.isArray(j?.Data) ? j.Data : [];
+    if (!rows.length) throw new Error("SBI iNAV: empty Data");
+
+    // Find SBI Gold ETF row
+    const row =
+      rows.find(r => /sbi\s*gold\s*etf/i.test(String(r.FundName || ""))) ||
+      rows.find(r => /gold/i.test(String(r.FundName || "")) && /etf/i.test(String(r.FundName || "")));
+
+    if (!row) throw new Error("SBI Gold ETF not found in Data");
+
+    const inav = parseFloat(row.LatestNAV);
+    if (!Number.isFinite(inav)) throw new Error("SBI Gold ETF LatestNAV not numeric");
+
+    return {
+      value: inav,
+      asOf: row.LatestNAVDate || null,
+      source: { provider: "sbimf", endpoint: "/home/GetETFNAVDetailsAsync", fundName: row.FundName }
+    };
+  } catch (e) {
+    return {
+      value: null,
+      asOf: null,
+      source: { provider: "sbimf", endpoint: "/home/GetETFNAVDetailsAsync", note: "inav_fetch_failed" }
+    };
+  }
 }
 
 // Wilder RSI(14)
