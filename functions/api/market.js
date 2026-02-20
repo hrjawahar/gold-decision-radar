@@ -3,11 +3,11 @@ export async function onRequestGet() {
 
   try {
     const [dxyObj, inrObj, realYieldObj, rsiObj] = await Promise.all([
-      getDxy(),
-      getUsdInr(),
-      getRealYield(),
-      getRsi14("SETFGOLD.NS") // RSI(14) for SETFGOLD
-    ]);
+  getDxy(),
+  getUsdInr(),
+  getRealYield(),
+  getRsi14Safe("SETFGOLD.NS")   // <-- safe wrapper
+]);
 
     const pct30d = inrObj.pct30d;
     let usdInrTrend = "stable";
@@ -179,7 +179,18 @@ async function fetchStooqClose(symbol, computePct=false) {
   }
   return { last, pct30d };
 }
-
+async function getRsi14Safe(symbol) {
+  try {
+    return await getRsi14(symbol);
+  } catch (e) {
+    // Don't fail the whole API if RSI fetch fails
+    return {
+      value: null,
+      asOf: null,
+      source: { provider: "yahoo", symbol, window: "3mo", interval: "1d", note: "rsi_fetch_failed" }
+    };
+  }
+}
 async function fetchFredLastValue(seriesId) {
   const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`;
   const res = await fetch(url, { headers: { "accept": "text/csv" } });
