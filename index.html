@@ -377,10 +377,9 @@ if ($("explain")) $("explain").textContent = `Fill: ${missing.join(", ")}`;
 applyDecisionZone("zone-wait");
 
 // --- guarded chips rendering (WAIT branch) ---
-const box = $("chips");
+const boxWait = $("chips");
 if (box) {
-  box.innerHTML = "";
-
+ boxWait.innerHTML = "";
   [
     ["USD/INR", inr || "—", scoreINR(inr)],
     ["Fed", (fed ? fed.replaceAll("_"," ") : "—"), scoreFed(fed)],
@@ -407,7 +406,7 @@ if (box) {
         const el=document.createElement("div");
         el.className="chip";
         el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
-        box.appendChild(el);
+        boxWait.appendChild(el);
       });
 
       return { total: null, label: "WAIT" };
