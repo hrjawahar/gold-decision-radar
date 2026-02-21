@@ -340,14 +340,13 @@
 
   function compute(){
     // --- Inputs ---
-    const fed = $("fedTone").value;
-    const geo = $("geoRisk").value;
-    const inr = $("inrTrend").value;
-
-    const rsi = toNum($("rsi14").value);
-    const price = toNum($("setfPrice").value);
-    const inav = toNum($("sbiInav").value);
-
+    const fed = $("fedTone")?.value ?? "";
+    const geo = $("geoRisk")?.value ?? "";
+    const inr = $("inrTrend")?.value ?? "";
+    
+    const rsi = toNum($("rsi14")?.value ?? "");
+    const price = toNum($("setfPrice")?.value ?? "");
+    const inav = toNum($("sbiInav")?.value ?? "");
     // --- Guardrail: refuse decision if required missing ---
     const missing = [];
     if (!inr) missing.push("USD/INR trend");
@@ -361,19 +360,41 @@
       $("dxyScore") && ($("dxyScore").textContent = $("dxyScore").textContent); // no-op (keeps layout stable)
       $("ryScore") && ($("ryScore").textContent = $("ryScore").textContent);   // no-op
 
-      $("fedScore").textContent = `Score: ${scoreFed(fed)}`;
-      $("geoScore").textContent = `Score: ${scoreGeo(geo)}`;
-      $("inrScore").textContent = `Score: ${scoreINR(inr)}`;
-      $("rsiScore").textContent = `Score: ${Number.isFinite(rsi) ? scoreRSI(rsi) : 0}`;
-      $("pxScore").textContent = `Score: 0`;
-      $("inavScore").textContent = `Score: 0`;
+      // --- guarded score pill updates (WAIT branch) ---
+if ($("fedScore")) $("fedScore").textContent = `Score: ${scoreFed(fed)}`;
+if ($("geoScore")) $("geoScore").textContent = `Score: ${scoreGeo(geo)}`;
+if ($("inrScore")) $("inrScore").textContent = `Score: ${scoreINR(inr)}`;
+if ($("rsiScore")) $("rsiScore").textContent = `Score: ${Number.isFinite(rsi) ? scoreRSI(rsi) : 0}`;
+if ($("pxScore")) $("pxScore").textContent = `Score: 0`;
+if ($("inavScore")) $("inavScore").textContent = `Score: 0`;
 
-      $("badge").textContent = "WAIT";
-      $("badge").className = "badge mid";
-      $("headline").textContent = `Insufficient inputs → WAIT`;
-      $("explain").textContent = `Fill: ${missing.join(", ")}`;
-      applyDecisionZone("zone-wait");
+if ($("badge")) {
+  $("badge").textContent = "WAIT";
+  $("badge").className = "badge mid";
+}
+if ($("headline")) $("headline").textContent = `Insufficient inputs → WAIT`;
+if ($("explain")) $("explain").textContent = `Fill: ${missing.join(", ")}`;
+applyDecisionZone("zone-wait");
 
+// --- guarded chips rendering (WAIT branch) ---
+const box = $("chips");
+if (box) {
+  box.innerHTML = "";
+
+  [
+    ["USD/INR", inr || "—", scoreINR(inr)],
+    ["Fed", (fed ? fed.replaceAll("_"," ") : "—"), scoreFed(fed)],
+    ["Geo", geo || "—", scoreGeo(geo)],
+    ["RSI14", ($("rsi14")?.value || "—"), Number.isFinite(rsi) ? scoreRSI(rsi) : 0],
+    ["SETFGOLD Px", ($("setfPrice")?.value || "—"), 0],
+    ["SBI iNAV", ($("sbiInav")?.value || "—"), 0]
+  ].forEach(([n, v, s]) => {
+    const el = document.createElement("div");
+    el.className = "chip";
+    el.innerHTML = `${n}: <code>${v}</code> • <b>${s}</b>`;
+    box.appendChild(el);
+  });
+}
       const box = $("chips");
       box.innerHTML = "";
       [["USD/INR", inr || "—", scoreINR(inr)],
@@ -403,52 +424,59 @@
 
     const total = round1(sInr + sRsi + sVal + sFed + sGeo);
 
-    // --- Update per-factor score pills ---
-    $("fedScore").textContent = `Score: ${sFed}`;
-    $("geoScore").textContent = `Score: ${sGeo}`;
-    $("inrScore").textContent = `Score: ${sInr}`;
-    $("rsiScore").textContent = `Score: ${sRsi}`;
-    $("pxScore").textContent = `Score: ${sVal}`;
-    $("inavScore").textContent = `Score: ${sVal}`;
+   // --- Update per-factor score pills (NORMAL branch) ---
+if ($("fedScore")) $("fedScore").textContent = `Score: ${sFed}`;
+if ($("geoScore")) $("geoScore").textContent = `Score: ${sGeo}`;
+if ($("inrScore")) $("inrScore").textContent = `Score: ${sInr}`;
+if ($("rsiScore")) $("rsiScore").textContent = `Score: ${sRsi}`;
 
-    // --- Decision label + zone ---
-    let action="HOLD", label="HOLD / SIP LIGHT", cls="mid", exp="Mixed signals / no edge.";
-    let zone="zone-hold";
-    if (total >= 2) { action="BUY"; label="BUY / ACCUMULATE"; cls="good"; exp="Tailwinds aligned."; zone="zone-buy"; }
-    else if (total <= -2) { action="TRIM"; label="TRIM / WAIT"; cls="bad"; exp="Headwinds / premium / overbought risk."; zone="zone-trim"; }
+// premium/discount score belongs to price-vs-iNAV comparison
+if ($("pxScore")) $("pxScore").textContent = `Score: ${sVal}`;
+// iNAV alone has no score (the comparison already scored it)
+if ($("inavScore")) $("inavScore").textContent = `Score: 0`;
 
-    $("badge").textContent = action;
-    $("badge").className = `badge ${cls}`;
-    $("headline").textContent = `Score: ${total.toFixed(1)} → ${label}`;
-    $("explain").textContent = exp;
-    applyDecisionZone(zone);
+// --- Decision label + zone (NORMAL branch) ---
+let action="HOLD", label="HOLD / SIP LIGHT", cls="mid", exp="Mixed signals / no edge.";
+let zone="zone-hold";
+if (total >= 2) { action="BUY"; label="BUY / ACCUMULATE"; cls="good"; exp="Tailwinds aligned."; zone="zone-buy"; }
+else if (total <= -2) { action="TRIM"; label="TRIM / WAIT"; cls="bad"; exp="Headwinds / premium / overbought risk."; zone="zone-trim"; }
 
-    // --- Chips (explainability) ---
-    const premText = (prem.premiumPct === null)
-      ? "—"
-      : `${prem.premiumPct >= 0 ? "+" : ""}${prem.premiumPct.toFixed(2)}% ${prem.premiumPct > 0 ? "premium" : "discount"}`;
+if ($("badge")) {
+  $("badge").textContent = action;
+  $("badge").className = `badge ${cls}`;
+}
+if ($("headline")) $("headline").textContent = `Score: ${total.toFixed(1)} → ${label}`;
+if ($("explain")) $("explain").textContent = exp;
+applyDecisionZone(zone);
 
-    const chips=[
-      ["USD/INR", inr, sInr],
-      ["RSI14", rsi.toFixed(1), sRsi],
-      ["Px vs iNAV", premText, sVal],
-      ["Fed", fed.replaceAll("_"," "), sFed],
-      ["Geo", geo, sGeo],
-      ["SETFGOLD Px", price.toFixed(2), 0],
-      ["SBI iNAV", inav.toFixed(4), 0]
-    ];
+// --- Chips (explainability) (NORMAL branch) ---
+const premText = (prem.premiumPct === null)
+  ? "—"
+  : `${prem.premiumPct >= 0 ? "+" : ""}${prem.premiumPct.toFixed(2)}% ${prem.premiumPct > 0 ? "premium" : "discount"}`;
 
-    const box=$("chips");
-    box.innerHTML="";
-    chips.forEach(([n,v,s])=>{
-      const el=document.createElement("div");
-      el.className="chip";
-      el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
-      box.appendChild(el);
-    });
+const box = $("chips");
+if (box) {
+  box.innerHTML = "";
 
-    return {total,label};
-  }
+  const chips = [
+    ["USD/INR", inr || "—", sInr],
+    ["RSI14", Number.isFinite(rsi) ? rsi.toFixed(1) : "—", sRsi],
+    ["Px vs iNAV", premText, sVal],
+    ["Fed", fed ? fed.replaceAll("_"," ") : "—", sFed],
+    ["Geo", geo || "—", sGeo],
+    ["SETFGOLD Px", Number.isFinite(price) ? price.toFixed(2) : "—", 0],
+    ["SBI iNAV", Number.isFinite(inav) ? inav.toFixed(4) : "—", 0]
+  ];
+
+  chips.forEach(([n, v, s]) => {
+    const el = document.createElement("div");
+    el.className = "chip";
+    el.innerHTML = `${n}: <code>${v}</code> • <b>${s}</b>`;
+    box.appendChild(el);
+  });
+}
+
+return { total, label };
 
   function save(){
     const payload={
@@ -514,7 +542,7 @@
 
     if($("asOf")) $("asOf").textContent="As of: —";
     if($("fresh")) $("fresh").textContent="Sources: —";
-    $("status").textContent="Status: ready";
+   if ($("status")) $("status").textContent="Status: ready";
 
     applyDecisionZone("zone-wait");
     compute();
@@ -540,8 +568,7 @@
   }
 
   async function autoFetch(){
-    $("status").textContent = "Status: fetching…";
-    try{
+  if ($("status")) $("status").textContent = "Status: fetching…";    try{
       const res = await fetch("/api/market", { cache: "no-store" });
       if(!res.ok) throw new Error(res.status);
       const data = await res.json();
@@ -580,11 +607,11 @@
       if($("asOf")) $("asOf").textContent = `As of: ${data.asOf || "—"}`;
       if (typeof formatSources === "function" && $("fresh")) $("fresh").textContent = formatSources(data.freshness);
 
-      $("status").textContent = "Status: fetched ✓";
+    if ($("status")) $("status").textContent = "Status: fetched ✓";
       compute();
       save();
     } catch(e) {
-      $("status").textContent = "Status: fetch failed (manual works)";
+      if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
       compute();
     }
   }
