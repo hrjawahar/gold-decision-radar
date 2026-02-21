@@ -195,11 +195,7 @@
 </div>
   <div class="hint" id="sbiInavAsOf">As of: —</div>
 </div>
-
-<!-- 2) Update USD/INR legend hint (under your USD/INR Trend select) -->
 <!-- Replace the existing hint under USD/INR Trend with: -->
-
-<!-- 3) Update Fed and Geo hint text (optional but recommended) -->
 <!-- Fed hint should read: -->
 <!-- Geo hint should read: -->
   
@@ -246,23 +242,22 @@
     Rule: Crisis / escalation = +1 • Normal = 0 • Risk fading = −1
   </div>
 </div>
-     <div class="field" style="grid-column: 1 / -1;">
+    <div class="field" style="grid-column: 1 / -1;">
   <div class="label">
     <b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span>
   </div>
 
   <select id="inrTrend">
-    <option value="weakening">INR weakening (USD/INR ↑) → supports gold</option>
+    <option value="weakening">INR weakening (USD/INR rising)</option>
     <option value="stable" selected>Stable / range-bound</option>
-    <option value="strengthening">INR strengthening (USD/INR ↓) → hurts gold</option>
+    <option value="strengthening">INR strengthening (USD/INR falling)</option>
   </select>
 
   <div class="hint">
-    Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
-    Auto-selected using ~30-day % change; you can override.
+    Rule: INR weakening = +1 • Stable = 0 • INR strengthening = −1
   </div>
 </div>
-      </div>
+    
 
       <details style="margin-top:12px;">
         <summary>Install on iPhone</summary>
