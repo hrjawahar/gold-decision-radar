@@ -125,9 +125,23 @@
       tabindex="0"
       data-tip="Legend: Red = USD/INR ↑ (INR weakening), Green = USD/INR ↓ (INR strengthening), Yellow = flat/range-bound (±0.2%).">
   USD/INR Spot: —
-</span>
-</div>
-      <div class="field" style="grid-column: 1 / -1;">
+<div class="field" style="grid-column: 1 / -1;">
+  <div class="label">
+    <b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span>
+  </div>
+
+  <select id="inrTrend">
+    <option value="weakening">INR weakening (USD/INR rising) → supports gold</option>
+    <option value="stable" selected>Stable / range-bound</option>
+    <option value="strengthening">INR strengthening (USD/INR falling) → hurts gold</option>
+  </select>
+
+  <div class="hint">
+    Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
+    Auto-selected using ~30-day % change; you can override.
+  </div>
+</div>      
+         <div class="field" style="grid-column: 1 / -1;">
   <div class="label"><b>RSI (14) – SETFGOLD</b><span id="rsiScore" class="pill">Score: 0</span></div>
   <input type="number" id="rsi14" step="0.1" inputmode="decimal" placeholder="Enter RSI(14) manually" />
   <div class="hint">
@@ -152,20 +166,10 @@
 
 <!-- 2) Update USD/INR legend hint (under your USD/INR Trend select) -->
 <!-- Replace the existing hint under USD/INR Trend with: -->
-<div class="hint">
-  Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
-  Auto-selected using ~30-day % change; you can override.
-</div>
 
 <!-- 3) Update Fed and Geo hint text (optional but recommended) -->
 <!-- Fed hint should read: -->
-<div class="hint">
-  Rule: Dovish / cuts likely = +1 • Neutral = 0 • Hawkish = −1
-</div>
 <!-- Geo hint should read: -->
-<div class="hint">
-  Rule: Crisis / escalation = +1 • Normal = 0 • Risk fading = −1
-</div>
 
     </style>
       <div class="inputs">
@@ -181,26 +185,36 @@
           <div class="hint">Rule: &lt;1.3 = +1, 1.3–1.7 = 0, &gt;1.7 = −1</div>
         </div>
 
-        <div class="field">
-          <div class="label"><b>Fed Tone (last 30 days)</b><span id="fedScore" class="pill">Score: 0</span></div>
-          <select id="fedTone">
-            <option value="cuts_likely">Rate cuts likely / dovish</option>
-            <option value="neutral" selected>Neutral / mixed</option>
-            <option value="hawkish">Cuts delayed / hawkish</option>
-          </select>
-          <div class="hint">Rule: Dovish +1, Neutral 0, Hawkish −1</div>
-        </div>
+       <div class="field">
+  <div class="label">
+    <b>Fed Tone (last 30 days)</b><span id="fedScore" class="pill">Score: 0</span>
+  </div>
 
-        <div class="field">
-          <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Score: 0</span></div>
-          <select id="geoRisk">
-            <option value="crisis">War / crisis escalating</option>
-            <option value="normal" selected>Normal</option>
-            <option value="fading">Risk fading / calming</option>
-          </select>
-          <div class="hint">Rule: Crisis +1, Normal 0, Fading −1</div>
-        </div>
+  <select id="fedTone">
+    <option value="cuts_likely">Rate cuts likely / dovish</option>
+    <option value="neutral" selected>Neutral / mixed</option>
+    <option value="hawkish">Cuts delayed / hawkish</option>
+  </select>
 
+  <div class="hint">
+    Rule: Dovish / cuts likely = +1 • Neutral = 0 • Hawkish = −1
+  </div>
+</div>
+       <div class="field">
+  <div class="label">
+    <b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Score: 0</span>
+  </div>
+
+  <select id="geoRisk">
+    <option value="crisis">War / crisis escalating</option>
+    <option value="normal" selected>Normal</option>
+    <option value="fading">Risk fading / calming</option>
+  </select>
+
+  <div class="hint">
+    Rule: Crisis / escalation = +1 • Normal = 0 • Risk fading = −1
+  </div>
+</div>
         <div class="field" style="grid-column: 1 / -1;">
           <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span></div>
           <select id="inrTrend">
