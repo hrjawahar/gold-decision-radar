@@ -129,14 +129,45 @@
 </div>
       <div class="field" style="grid-column: 1 / -1;">
   <div class="label"><b>RSI (14) – SETFGOLD</b><span id="rsiScore" class="pill">Score: 0</span></div>
-  <input type="number" id="rsi14" step="0.1" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
-  <div class="hint">Rule: RSI &lt;30 = +1 (oversold), 30–70 = 0, &gt;70 = −1 (overbought)</div>
+  <input type="number" id="rsi14" step="0.1" inputmode="decimal" placeholder="Enter RSI(14) manually" />
+  <div class="hint">
+  Rule: RSI &lt; 30 = +1 (oversold) • 30–70 = 0 • &gt; 70 = −1 (overbought)
 </div>
+
 <div class="field" style="grid-column: 1 / -1;">
-  <div class="label"><b>SBI Gold ETF iNAV (LatestNAV)</b></div>
-  <input type="text" id="sbiInav" readonly placeholder="Auto-fetched" />
+  <div class="label"><b>SETFGOLD Market Price (₹)</b><span id="pxScore" class="pill">Score: 0</span></div>
+  <input type="number" id="setfPrice" step="0.01" inputmode="decimal" placeholder="Enter current SETFGOLD price manually" />
+ <div class="hint">
+  Rule: Compared with iNAV → Discount ≤ −0.30% = +1 • ±0.30% = 0 • Premium ≥ +0.30% = −1
+</div>
+
+<div class="field" style="grid-column: 1 / -1;">
+  <div class="label"><b>SBI Gold ETF iNAV (₹)</b><span id="inavScore" class="pill">Score: 0</span></div>
+  <input type="number" id="sbiInav" step="0.0001" inputmode="decimal" placeholder="Enter latest SBI iNAV manually" />
+  <div class="hint" id="sbiInavRule">
+  Rule: Discount ≤ −0.30% = +1 • ±0.30% = 0 • Premium ≥ +0.30% = −1
+</div>
   <div class="hint" id="sbiInavAsOf">As of: —</div>
 </div>
+
+<!-- 2) Update USD/INR legend hint (under your USD/INR Trend select) -->
+<!-- Replace the existing hint under USD/INR Trend with: -->
+<div class="hint">
+  Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
+  Auto-selected using ~30-day % change; you can override.
+</div>
+
+<!-- 3) Update Fed and Geo hint text (optional but recommended) -->
+<!-- Fed hint should read: -->
+<div class="hint">
+  Rule: Dovish / cuts likely = +1 • Neutral = 0 • Hawkish = −1
+</div>
+<!-- Geo hint should read: -->
+<div class="hint">
+  Rule: Crisis / escalation = +1 • Normal = 0 • Risk fading = −1
+</div>
+
+    </style>
       <div class="inputs">
         <div class="field">
           <div class="label"><b>DXY</b><span id="dxyScore" class="pill">Score: 0</span></div>
@@ -221,146 +252,225 @@
   const storageKey = "goldDecisionRadar:v31";
 
   const round1 = (x)=> Math.round(x*10)/10;
-const toNum = (v)=> { const n=parseFloat(v); return Number.isFinite(n)?n:null; };
+  const toNum = (v)=> { const n=parseFloat(v); return Number.isFinite(n)?n:null; };
 
-// Match your UI rules
-function scoreDXY(v){ return v==null?0:(v<102?1:(v<=105?0:-1)); }
-function scoreRY(v){  return v==null?0:(v<1.30?1:(v<=1.70?0:-1)); }
-function scoreFed(t){ return t==="cuts_likely"?1:(t==="hawkish"?-1:0); }
-function scoreGeo(g){ return g==="crisis"?1:(g==="fading"?-1:0); }
-function scoreINR(t){ return t==="weakening"?1:(t==="strengthening"?-1:0); }
+  // ---- Scores (match UI rules) ----
+  function scoreFed(t){ return t==="cuts_likely"?1:(t==="hawkish"?-1:0); }
+  function scoreGeo(g){ return g==="crisis"?1:(g==="fading"?-1:0); }
+  function scoreINR(t){ return t==="weakening"?1:(t==="strengthening"?-1:0); }
 
-// RSI rule per your hint text: <30 +1, 30–70 0, >70 −1
-function scoreRSI(rsi){
-  if(!Number.isFinite(rsi)) return 0;
-  if(rsi < 30) return 1;
-  if(rsi > 70) return -1;
-  return 0;
-}
+  // RSI: <30 +1, 30–70 0, >70 −1
+  function scoreRSI(rsi){
+    if(!Number.isFinite(rsi)) return 0;
+    if(rsi < 30) return 1;
+    if(rsi > 70) return -1;
+    return 0;
+  }
 
-function compute(){
-  const dxy = toNum($("dxy").value);
-  const ry  = toNum($("realYield").value);
-  const fed = $("fedTone").value;
-  const geo = $("geoRisk").value;
-  const inr = $("inrTrend").value;
-  const rsi = toNum($("rsi14").value);
+  // Price vs iNAV premium/discount:
+  // premiumPct = ((price - inav) / inav) * 100
+  // <= -0.30% => +1, within ±0.30% => 0, >= +0.30% => -1
+  function scorePremium(price, inav){
+    if(!Number.isFinite(price) || !Number.isFinite(inav) || inav === 0) return {score: 0, premiumPct: null};
+    const premiumPct = ((price - inav) / inav) * 100;
+    let score = 0;
+    if (premiumPct <= -0.30) score = 1;
+    else if (premiumPct >= 0.30) score = -1;
+    return {score, premiumPct};
+  }
 
-  const s1 = scoreDXY(dxy);
-  const s2 = scoreRY(ry);
-  const s3 = scoreFed(fed);
-  const s4 = scoreGeo(geo);
-  const s5 = scoreINR(inr);
-  const s6 = scoreRSI(rsi);
+  function applyDecisionZone(zone){
+    const panel = document.querySelector(".card.panel");
+    if (!panel) return;
+    panel.classList.remove("zone-buy","zone-hold","zone-trim","zone-wait");
+    panel.classList.add(zone);
+  }
 
-  const total = round1(s1+s2+s3+s4+s5+s6);
+  function compute(){
+    // --- Inputs ---
+    const fed = $("fedTone").value;
+    const geo = $("geoRisk").value;
+    const inr = $("inrTrend").value;
 
-  $("dxyScore").textContent=`Score: ${s1}`;
-  $("ryScore").textContent=`Score: ${s2}`;
-  $("fedScore").textContent=`Score: ${s3}`;
-  $("geoScore").textContent=`Score: ${s4}`;
-  $("inrScore").textContent=`Score: ${s5}`;
-  $("rsiScore").textContent=`Score: ${s6}`;
+    const rsi = toNum($("rsi14").value);
+    const price = toNum($("setfPrice").value);
+    const inav = toNum($("sbiInav").value);
 
-  let action="HOLD", label="HOLD / SIP LIGHT", cls="mid", exp="Sideways zone.";
-  if (total>=2){ action="BUY"; label="BUY / ACCUMULATE"; cls="good"; exp="Macro supports gold."; }
-  else if (total<=-2){ action="TRIM"; label="TRIM / EXIT / WAIT"; cls="bad"; exp="High correction risk."; }
+    // --- Guardrail: refuse decision if required missing ---
+    const missing = [];
+    if (!inr) missing.push("USD/INR trend");
+    if (rsi === null) missing.push("RSI(14)");
+    if (price === null) missing.push("SETFGOLD price");
+    if (inav === null) missing.push("SBI iNAV");
+    if (!fed) missing.push("Fed tone");
+    if (!geo) missing.push("Geopolitics");
 
-  $("badge").textContent=action;
-  $("badge").className=`badge ${cls}`;
-  $("headline").textContent=`Score: ${total.toFixed(1)} → ${label}`;
-  $("explain").textContent=exp;
+    if (missing.length){
+      $("dxyScore") && ($("dxyScore").textContent = $("dxyScore").textContent); // no-op (keeps layout stable)
+      $("ryScore") && ($("ryScore").textContent = $("ryScore").textContent);   // no-op
 
-  const chips=[
-    ["DXY", $("dxy").value||"—", s1],
-    ["RealYield", $("realYield").value||"—", s2],
-    ["Fed", fed.replaceAll("_"," "), s3],
-    ["Geo", geo, s4],
-    ["USD/INR", inr, s5],
-    ["RSI14", $("rsi14").value||"—", s6],
-    ["SBI iNAV", $("sbiInav")?.value||"—", 0]
-  ];
+      $("fedScore").textContent = `Score: ${scoreFed(fed)}`;
+      $("geoScore").textContent = `Score: ${scoreGeo(geo)}`;
+      $("inrScore").textContent = `Score: ${scoreINR(inr)}`;
+      $("rsiScore").textContent = `Score: ${Number.isFinite(rsi) ? scoreRSI(rsi) : 0}`;
+      $("pxScore").textContent = `Score: 0`;
+      $("inavScore").textContent = `Score: 0`;
 
-  const box=$("chips");
-  box.innerHTML="";
-  chips.forEach(([n,v,s])=>{
-    const el=document.createElement("div");
-    el.className="chip";
-    el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
-    box.appendChild(el);
-  });
+      $("badge").textContent = "WAIT";
+      $("badge").className = "badge mid";
+      $("headline").textContent = `Insufficient inputs → WAIT`;
+      $("explain").textContent = `Fill: ${missing.join(", ")}`;
+      applyDecisionZone("zone-wait");
 
-  return {total,label,s1,s2,s3,s4,s5,s6};
-}
+      const box = $("chips");
+      box.innerHTML = "";
+      [["USD/INR", inr || "—", scoreINR(inr)],
+       ["Fed", fed.replaceAll("_"," "), scoreFed(fed)],
+       ["Geo", geo, scoreGeo(geo)],
+       ["RSI14", $("rsi14").value || "—", Number.isFinite(rsi)?scoreRSI(rsi):0],
+       ["SETFGOLD Px", $("setfPrice").value || "—", 0],
+       ["SBI iNAV", $("sbiInav").value || "—", 0]
+      ].forEach(([n,v,s])=>{
+        const el=document.createElement("div");
+        el.className="chip";
+        el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
+        box.appendChild(el);
+      });
+
+      return { total: null, label: "WAIT" };
+    }
+
+    // --- Scores ---
+    const sFed = scoreFed(fed);
+    const sGeo = scoreGeo(geo);
+    const sInr = scoreINR(inr);
+    const sRsi = scoreRSI(rsi);
+
+    const prem = scorePremium(price, inav);
+    const sVal = prem.score;
+
+    const total = round1(sInr + sRsi + sVal + sFed + sGeo);
+
+    // --- Update per-factor score pills ---
+    $("fedScore").textContent = `Score: ${sFed}`;
+    $("geoScore").textContent = `Score: ${sGeo}`;
+    $("inrScore").textContent = `Score: ${sInr}`;
+    $("rsiScore").textContent = `Score: ${sRsi}`;
+    $("pxScore").textContent = `Score: ${sVal}`;
+    $("inavScore").textContent = `Score: ${sVal}`;
+
+    // --- Decision label + zone ---
+    let action="HOLD", label="HOLD / SIP LIGHT", cls="mid", exp="Mixed signals / no edge.";
+    let zone="zone-hold";
+    if (total >= 2) { action="BUY"; label="BUY / ACCUMULATE"; cls="good"; exp="Tailwinds aligned."; zone="zone-buy"; }
+    else if (total <= -2) { action="TRIM"; label="TRIM / WAIT"; cls="bad"; exp="Headwinds / premium / overbought risk."; zone="zone-trim"; }
+
+    $("badge").textContent = action;
+    $("badge").className = `badge ${cls}`;
+    $("headline").textContent = `Score: ${total.toFixed(1)} → ${label}`;
+    $("explain").textContent = exp;
+    applyDecisionZone(zone);
+
+    // --- Chips (explainability) ---
+    const premText = (prem.premiumPct === null)
+      ? "—"
+      : `${prem.premiumPct >= 0 ? "+" : ""}${prem.premiumPct.toFixed(2)}% ${prem.premiumPct > 0 ? "premium" : "discount"}`;
+
+    const chips=[
+      ["USD/INR", inr, sInr],
+      ["RSI14", rsi.toFixed(1), sRsi],
+      ["Px vs iNAV", premText, sVal],
+      ["Fed", fed.replaceAll("_"," "), sFed],
+      ["Geo", geo, sGeo],
+      ["SETFGOLD Px", price.toFixed(2), 0],
+      ["SBI iNAV", inav.toFixed(4), 0]
+    ];
+
+    const box=$("chips");
+    box.innerHTML="";
+    chips.forEach(([n,v,s])=>{
+      const el=document.createElement("div");
+      el.className="chip";
+      el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
+      box.appendChild(el);
+    });
+
+    return {total,label};
+  }
+
   function save(){
-  const payload={
-    dxy:$("dxy").value,
-    realYield:$("realYield").value,
-    fedTone:$("fedTone").value,
-    geoRisk:$("geoRisk").value,
-    inrTrend:$("inrTrend").value,
+    const payload={
+      dxy:$("dxy")?.value ?? "",
+      realYield:$("realYield")?.value ?? "",
+      fedTone:$("fedTone").value,
+      geoRisk:$("geoRisk").value,
+      inrTrend:$("inrTrend").value,
 
-    // ✅ new
-    rsi14:$("rsi14")?.value ?? "",
-    sbiInav:$("sbiInav")?.value ?? "",
-    sbiInavAsOf:$("sbiInavAsOf")?.textContent ?? "",
+      // manual inputs
+      rsi14:$("rsi14")?.value ?? "",
+      setfPrice:$("setfPrice")?.value ?? "",
+      sbiInav:$("sbiInav")?.value ?? "",
+      sbiInavAsOf:$("sbiInavAsOf")?.textContent ?? "",
 
-    asOf:$("asOf").textContent,
-    fresh:$("fresh").textContent,
-    lastSavedISO:new Date().toISOString()
-  };
-  localStorage.setItem(storageKey, JSON.stringify(payload));
-  $("btnSave").textContent="Saved ✓";
-  setTimeout(()=> $("btnSave").textContent="Save", 900);
-}
+      asOf:$("asOf")?.textContent ?? "",
+      fresh:$("fresh")?.textContent ?? "",
+      lastSavedISO:new Date().toISOString()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(payload));
+    $("btnSave").textContent="Saved ✓";
+    setTimeout(()=> $("btnSave").textContent="Save", 900);
+  }
 
-function load(){
-  try{
-    const raw=localStorage.getItem(storageKey);
-    if(!raw) return false;
-    const d=JSON.parse(raw);
+  function load(){
+    try{
+      const raw=localStorage.getItem(storageKey);
+      if(!raw) return false;
+      const d=JSON.parse(raw);
 
-    if(d.dxy!=null) $("dxy").value=d.dxy;
-    if(d.realYield!=null) $("realYield").value=d.realYield;
-    if(d.fedTone) $("fedTone").value=d.fedTone;
-    if(d.geoRisk) $("geoRisk").value=d.geoRisk;
-    if(d.inrTrend) $("inrTrend").value=d.inrTrend;
+      if($("dxy") && d.dxy!=null) $("dxy").value=d.dxy;
+      if($("realYield") && d.realYield!=null) $("realYield").value=d.realYield;
 
-    // ✅ new
-    if(d.rsi14!=null && $("rsi14")) $("rsi14").value=d.rsi14;
-    if(d.sbiInav!=null && $("sbiInav")) $("sbiInav").value=d.sbiInav;
-    if(d.sbiInavAsOf!=null && $("sbiInavAsOf")) $("sbiInavAsOf").textContent=d.sbiInavAsOf;
+      if(d.fedTone) $("fedTone").value=d.fedTone;
+      if(d.geoRisk) $("geoRisk").value=d.geoRisk;
+      if(d.inrTrend) $("inrTrend").value=d.inrTrend;
 
-    if(d.asOf) $("asOf").textContent=d.asOf;
-    if(d.fresh) $("fresh").textContent=d.fresh;
+      if($("rsi14") && d.rsi14!=null) $("rsi14").value=d.rsi14;
+      if($("setfPrice") && d.setfPrice!=null) $("setfPrice").value=d.setfPrice;
+      if($("sbiInav") && d.sbiInav!=null) $("sbiInav").value=d.sbiInav;
+      if($("sbiInavAsOf") && d.sbiInavAsOf!=null) $("sbiInavAsOf").textContent=d.sbiInavAsOf;
 
-    return true;
-  }catch(e){ return false; }
-}
+      if($("asOf") && d.asOf) $("asOf").textContent=d.asOf;
+      if($("fresh") && d.fresh) $("fresh").textContent=d.fresh;
 
-function resetAll(){
-  localStorage.removeItem(storageKey);
+      return true;
+    }catch(e){ return false; }
+  }
 
-  $("dxy").value="";
-  $("realYield").value="";
-  $("fedTone").value="neutral";
-  $("geoRisk").value="normal";
-  $("inrTrend").value="stable";
+  function resetAll(){
+    localStorage.removeItem(storageKey);
 
-  // ✅ new
-  if ($("rsi14")) $("rsi14").value="";
-  if ($("sbiInav")) $("sbiInav").value="";
-  if ($("sbiInavAsOf")) $("sbiInavAsOf").textContent="As of: —";
+    if($("dxy")) $("dxy").value="";
+    if($("realYield")) $("realYield").value="";
+    $("fedTone").value="neutral";
+    $("geoRisk").value="normal";
+    $("inrTrend").value="stable";
 
-  $("asOf").textContent="As of: —";
-  $("fresh").textContent="Sources: —";
-  $("status").textContent="Status: ready";
+    if ($("rsi14")) $("rsi14").value="";
+    if ($("setfPrice")) $("setfPrice").value="";
+    if ($("sbiInav")) $("sbiInav").value="";
+    if ($("sbiInavAsOf")) $("sbiInavAsOf").textContent="As of: —";
 
-  compute();
-}
+    if($("asOf")) $("asOf").textContent="As of: —";
+    if($("fresh")) $("fresh").textContent="Sources: —";
+    $("status").textContent="Status: ready";
+
+    applyDecisionZone("zone-wait");
+    compute();
+  }
+
   async function share(){
     const r=compute();
-    const text=`Gold Radar v3.1\nScore: ${r.total.toFixed(1)} → ${r.label}`;
+    const text=`Gold Radar v3.1\n${r.total===null?"WAIT (missing inputs)":("Score: "+r.total.toFixed(1)+" → "+r.label)}`;
     try{
       if(navigator.share) await navigator.share({title:"Gold Radar", text});
       else { await navigator.clipboard.writeText(text); alert("Copied."); }
@@ -378,71 +488,62 @@ function resetAll(){
   }
 
   async function autoFetch(){
-  $("status").textContent = "Status: fetching…";
-  try{
-    const res = await fetch("/api/market", { cache: "no-store" });
-    if(!res.ok) throw new Error(res.status);
-    const data = await res.json();
+    $("status").textContent = "Status: fetching…";
+    try{
+      const res = await fetch("/api/market", { cache: "no-store" });
+      if(!res.ok) throw new Error(res.status);
+      const data = await res.json();
 
-    // RSI (SETFGOLD)
-    if (Number.isFinite(data.rsi14Setfgold)) $("rsi14").value = data.rsi14Setfgold.toFixed(1);
+      // Core factors (auto)
+      if ($("dxy") && Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
+      if ($("realYield") && Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
+      if (data.usdInrTrend) $("inrTrend").value = data.usdInrTrend;
 
-    // Core factors
-    if (Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
-    if (Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
-    if (data.usdInrTrend) $("inrTrend").value = data.usdInrTrend;
-    if (Number.isFinite(data.sbiGoldEtfInav)) {
-  $("sbiInav").value = data.sbiGoldEtfInav.toFixed(4);
-}
-$("sbiInavAsOf").textContent = `As of: ${data.sbiGoldEtfInavAsOf || "—"}`;
+      // Manual factors: DO NOT overwrite (RSI, SETFGOLD price, iNAV)
 
-    // USD/INR Spot + 30d change display + color
-    if (Number.isFinite(data.usdInr)) {
-      const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
+      // USD/INR Spot + 30d change display + color
+      if (Number.isFinite(data.usdInr)) {
+        const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
 
-    let arrow = "→";
-    let cls = "usdinr-flat";
-    if (pct !== null) {
-      if (pct > 0.2) { arrow = "↑"; cls = "usdinr-up"; }
-      else if (pct < -0.2) { arrow = "↓"; cls = "usdinr-down"; }
-}
+        let arrow = "→";
+        let cls = "inr-flat";
+        if (pct !== null) {
+          if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
+          else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
+        }
 
-      const pctText = (pct === null)
-        ? ""
-        : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
+        const pctText = (pct === null)
+          ? ""
+          : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
 
-      const el = document.getElementById("usdInrSpot");
-      if (el) {
-        el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
-        el.classList.remove("inr-up","inr-down","inr-flat");
-        el.classList.add(cls);
+        const el = document.getElementById("usdInrSpot");
+        if (el) {
+          el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
+          el.classList.remove("inr-up","inr-down","inr-flat");
+          el.classList.add(cls);
+        }
       }
+
+      // Meta
+      if($("asOf")) $("asOf").textContent = `As of: ${data.asOf || "—"}`;
+      if (typeof formatSources === "function" && $("fresh")) $("fresh").textContent = formatSources(data.freshness);
+
+      $("status").textContent = "Status: fetched ✓";
+      compute();
+      save();
+    } catch(e) {
+      $("status").textContent = "Status: fetch failed (manual works)";
+      compute();
     }
-
-    // Meta
-    $("asOf").textContent = `As of: ${data.asOf || "—"}`;
-
-    // If you have formatSources() function, keep this line; otherwise comment it out
-    if (typeof formatSources === "function") {
-      $("fresh").textContent = formatSources(data.freshness);
-    }
-
-    $("status").textContent = "Status: fetched ✓";
-    compute();
-    save();
-
-  } catch(e) {
-    $("status").textContent = "Status: fetch failed (manual works)";
-    compute();
   }
-}
 
-  ["dxy","realYield","fedTone","geoRisk","inrTrend","rsi14","sbiInav"].forEach(id=>{
-  const el = $(id);
-  if(!el) return;
-  el.addEventListener("input", compute);
-  el.addEventListener("change", compute);
-});
+  // ---- Wire listeners ----
+  ["dxy","realYield","fedTone","geoRisk","inrTrend","rsi14","setfPrice","sbiInav"].forEach(id=>{
+    const el = $(id);
+    if(!el) return;
+    el.addEventListener("input", compute);
+    el.addEventListener("change", compute);
+  });
 
   $("btnSave").addEventListener("click", save);
   $("btnReset").addEventListener("click", ()=>{ if(confirm("Reset all values?")) resetAll(); });
@@ -452,6 +553,27 @@ $("sbiInavAsOf").textContent = `As of: ${data.sbiGoldEtfInavAsOf || "—"}`;
   const hadSaved=load();
   compute();
   if(!hadSaved) autoFetch();
+</script>
+
+<style>
+/* ✅ Add these decision-zone styles to your CSS */
+.zone-buy {
+  background: linear-gradient(135deg, #e8f7ee, #f4fcf7);
+  border: 1px solid #7bc89b;
+}
+.zone-hold {
+  background: linear-gradient(135deg, #fff7e0, #fffdf5);
+  border: 1px solid #e6c76e;
+}
+.zone-trim {hint
+  background: linear-gradient(135deg, #fdeaea, #fff5f5);
+  border: 1px solid #e38b8b;
+}
+.zone-wait {
+  background: linear-gradient(135deg, #f2f2f2, #fafafa);
+  border: 1px solid #bdbdbd;
+}
+</style>
 </script>
 </body>
 </html>
