@@ -2,47 +2,48 @@ export async function onRequestGet() {
   const cacheSeconds = 120;
 
   try {
-    const [dxyObj, inrObj, realYieldObj, rsiObj, sbiInavObj] = await Promise.all([
+    // Only auto feeds (manual RSI + manual iNAV per your confirmation)
+    const [dxyObj, inrObj] = await Promise.all([
       getDxy(),
       getUsdInr(),
-      getRealYield(),
-      getRsi14Safe("SBIGOLD.NS"),
-      getSbiGoldEtfInavSafe()
     ]);
 
+    const dxy = dxyObj?.value;
+    const usdInr = inrObj?.value;
+
     const result = {
-      dxy: dxyObj?.value ?? null,
-      realYield: realYieldObj?.value ?? null,
-      usdInr: inrObj?.value ?? null,
-      usdInrChangePct30d: inrObj?.pct30d ?? null,
+      // --- Auto factors ---
+      dxy: Number.isFinite(dxy) ? dxy : null,
+      usdInr: Number.isFinite(usdInr) ? usdInr : null,
+      usdInrChangePct30d:
+        (typeof inrObj?.pct30d === "number" && Number.isFinite(inrObj.pct30d)) ? inrObj.pct30d : null,
       usdInrTrend: inrObj?.trend ?? null,
 
-      rsi14Setfgold: rsiObj?.value ?? null,
-      rsi14SetfgoldAsOf: rsiObj?.asOf ?? null,
-      rsi14: rsiObj?.value ?? null,
-      rsi14AsOf: rsiObj?.asOf ?? null,
-      rsi14: rsiObj?.value ?? null,
-      rsi14AsOf: rsiObj?.asOf ?? null,
-      rsiSymbol: "SETFGOLD.NS",
+      // --- Manual factors (server must NOT fetch) ---
+      rsi14Setfgold: null,
+      rsi14SetfgoldAsOf: null,
+      sbiGoldEtfInav: null,
+      sbiGoldEtfInavAsOf: null,
 
-      sbiGoldEtfInav: sbiInavObj?.value ?? null,
-      sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
-
+      // --- Meta ---
       asOf: new Date().toISOString(),
+      contractVersion: 3,
+
+      quality: {
+        dxy: Number.isFinite(dxy) ? "ok" : "missing",
+        usdInr: Number.isFinite(usdInr) ? "ok" : "missing",
+      },
 
       freshness: {
         dxy: dxyObj?.source ?? null,
         usdInr: inrObj?.source ?? null,
-        realYield: realYieldObj?.source ?? null,
-        rsi: rsiObj?.source ?? null,
-        sbiInav: sbiInavObj?.source ?? null
+        rsi: { provider: "manual" },
+        sbiInav: { provider: "manual" },
       },
 
       sources: {
         yahoo: "https://query1.finance.yahoo.com/v8/finance/chart/",
         stooq: "https://stooq.com/q/l/",
-        fred: "https://fred.stlouisfed.org/graph/fredgraph.csv",
-        sbimf: "https://etf.sbimf.com/home/GetETFNAVDetailsAsync"
       }
     };
 
@@ -64,8 +65,13 @@ export async function onRequestGet() {
     });
   }
 }
-
 /* -------------------- existing factors -------------------- */
+/* ===================== DESIGN NOTE =====================
+
+RSI & SBI iNAV are manual inputs by design.
+Do NOT fetch them server-side to avoid dependency risk.
+
+========================================================= */
 
 async function getDxy() {
   try {
