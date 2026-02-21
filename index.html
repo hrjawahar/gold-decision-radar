@@ -95,6 +95,46 @@
 .pill[data-tip]{
   -webkit-tap-highlight-color: transparent;
 }
+/* ===== BOLD DECISION ZONES ===== */
+
+.zone-buy {
+  background: #0f9d58;      /* Strong green */
+  border: 2px solid #0b6f3f;
+  color: #ffffff;
+}
+
+.zone-hold {
+  background: #f4b400;      /* Bold amber */
+  border: 2px solid #c69500;
+  color: #ffffff;
+}
+
+.zone-trim {
+  background: #db4437;      /* Strong red */
+  border: 2px solid #a52714;
+  color: #ffffff;
+}
+
+.zone-wait {
+  background: #424242;      /* Dark grey */
+  border: 2px solid #1f1f1f;
+  color: #ffffff;
+}
+.zone-buy *,
+.zone-hold *,
+.zone-trim *,
+.zone-wait * {
+  color: #ffffff !important;
+}
+
+.zone-buy .chip,
+.zone-hold .chip,
+.zone-trim .chip,
+.zone-wait .chip {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+}    
+
 </style>
 </head>
 <body>
@@ -114,38 +154,29 @@
 
   <div class="grid">
     <section class="card">
-      <div class="row" style="margin-bottom:12px;">
-        <span class="pill" id="status">Status: ready</span>
-        <span class="pill" id="asOf">As of: —</span>
-        <span class="pill" id="fresh">Sources: —</span>
-      </div>
+    <div class="row" style="margin-bottom:12px;">
+  <span class="pill" id="status">Status: ready</span>
+  <span class="pill" id="asOf">As of: —</span>
+  <span class="pill" id="fresh">Sources: —</span>
+</div>  
+     <div class="field" style="grid-column: 1 / -1; margin-bottom:12px;">
+  <div class="label"><b>USD/INR Spot</b></div>
 
-     <div class="row" style="margin-bottom:12px;">
-       <span class="pill" id="usdInrSpot"
-      tabindex="0"
-      data-tip="Legend: Red = USD/INR ↑ (INR weakening), Green = USD/INR ↓ (INR strengthening), Yellow = flat/range-bound (±0.2%).">
-  USD/INR Spot: —
-<div class="field" style="grid-column: 1 / -1;">
-  <div class="label">
-    <b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span>
-  </div>
-
-  <select id="inrTrend">
-    <option value="weakening">INR weakening (USD/INR rising) → supports gold</option>
-    <option value="stable" selected>Stable / range-bound</option>
-    <option value="strengthening">INR strengthening (USD/INR falling) → hurts gold</option>
-  </select>
+  <span class="pill" id="usdInrSpot"
+    tabindex="0"
+    data-tip="Legend: Red = USD/INR ↑ (INR weakening), Green = USD/INR ↓ (INR strengthening), Yellow = flat/range-bound (±0.2%).">
+    USD/INR Spot: —
+  </span>
 
   <div class="hint">
     Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
-    Auto-selected using ~30-day % change; you can override.
   </div>
-</div>      
-         <div class="field" style="grid-column: 1 / -1;">
+</div>         <div class="field" style="grid-column: 1 / -1;">
   <div class="label"><b>RSI (14) – SETFGOLD</b><span id="rsiScore" class="pill">Score: 0</span></div>
   <input type="number" id="rsi14" step="0.1" inputmode="decimal" placeholder="Enter RSI(14) manually" />
   <div class="hint">
   Rule: RSI &lt; 30 = +1 (oversold) • 30–70 = 0 • &gt; 70 = −1 (overbought)
+</div>
 </div>
 
 <div class="field" style="grid-column: 1 / -1;">
@@ -153,6 +184,7 @@
   <input type="number" id="setfPrice" step="0.01" inputmode="decimal" placeholder="Enter current SETFGOLD price manually" />
  <div class="hint">
   Rule: Compared with iNAV → Discount ≤ −0.30% = +1 • ±0.30% = 0 • Premium ≥ +0.30% = −1
+</div>
 </div>
 
 <div class="field" style="grid-column: 1 / -1;">
@@ -170,8 +202,7 @@
 <!-- 3) Update Fed and Geo hint text (optional but recommended) -->
 <!-- Fed hint should read: -->
 <!-- Geo hint should read: -->
-
-    </style>
+  
       <div class="inputs">
         <div class="field">
           <div class="label"><b>DXY</b><span id="dxyScore" class="pill">Score: 0</span></div>
@@ -215,15 +246,22 @@
     Rule: Crisis / escalation = +1 • Normal = 0 • Risk fading = −1
   </div>
 </div>
-        <div class="field" style="grid-column: 1 / -1;">
-          <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span></div>
-          <select id="inrTrend">
-            <option value="weakening">INR weakening (USD/INR rising) → supports gold</option>
-            <option value="stable" selected>Stable / range-bound</option>
-            <option value="strengthening">INR strengthening (USD/INR falling) → hurts gold</option>
-          </select>
-          <div class="hint">Auto-selected using ~30-day % change. You can override.</div>
-        </div>
+     <div class="field" style="grid-column: 1 / -1;">
+  <div class="label">
+    <b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span>
+  </div>
+
+  <select id="inrTrend">
+    <option value="weakening">INR weakening (USD/INR ↑) → supports gold</option>
+    <option value="stable" selected>Stable / range-bound</option>
+    <option value="strengthening">INR strengthening (USD/INR ↓) → hurts gold</option>
+  </select>
+
+  <div class="hint">
+    Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
+    Auto-selected using ~30-day % change; you can override.
+  </div>
+</div>
       </div>
 
       <details style="margin-top:12px;">
@@ -568,67 +606,5 @@
   compute();
   if(!hadSaved) autoFetch();
 </script>
-
-<style>
-/* ✅ Add these decision-zone styles to your CSS */
-/* ===== BOLD DECISION ZONES ===== */
-
-.zone-buy {
-  background: #0f9d58;      /* Strong green */
-  border: 2px solid #0b6f3f;
-  color: #ffffff;
-}
-
-.zone-hold {
-  background: #f4b400;      /* Bold amber */
-  border: 2px solid #c69500;
-  color: #ffffff;
-}
-
-.zone-trim {
-  background: #db4437;      /* Strong red */
-  border: 2px solid #a52714;
-  color: #ffffff;
-}
-
-.zone-wait {
-  background: #424242;      /* Dark grey */
-  border: 2px solid #1f1f1f;
-  color: #ffffff;
-}
-
-/* Ensure all text inside panel stays white */
-
-.zone-buy *,
-.zone-hold *,
-.zone-trim *,
-.zone-wait * {
-  color: #ffffff !important;
-}
-
-/* Chips readability inside colored panel */
-
-.zone-buy .chip,
-.zone-hold .chip,
-.zone-trim .chip,
-.zone-wait .chip {
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.3);
-  color: #ffffff;
-}
-
-/* Badge contrast */
-
-.zone-buy .badge,
-.zone-hold .badge,
-.zone-trim .badge,
-.zone-wait .badge {
-  background: rgba(0,0,0,0.25);
-  color: #ffffff;
-}
-</style>
-
-</script>
-
 </body>
 </html>
