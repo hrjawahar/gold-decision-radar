@@ -619,7 +619,7 @@ async function autoFetch(){
   if ($("status")) $("status").textContent = "Status: fetching…";
 
   try{
-    const res = await fetch("/api/market", { cache: "no-store" });
+    const res = await fetch("/api/market?inav=off", { cache: "no-store" });
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
