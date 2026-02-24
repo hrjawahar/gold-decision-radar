@@ -619,10 +619,10 @@ async function autoFetch(){
   if ($("status")) $("status").textContent = "Status: fetching…";
 
   try{
-    const res = await fetch("/api/market?inav=off", { cache: "no-store" });
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+     const res = await fetch("/api/market?inav=off", { cache: "no-store" });
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const data = await res.json();
+const data = await res.json(); //
 
     // Core (auto)
     if ($("dxy") && Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
