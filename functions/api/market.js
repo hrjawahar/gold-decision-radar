@@ -224,10 +224,26 @@ function computeRsi14(closes) {
 async function getSbiGoldEtfInavSafe() {
   try {
     const url = "https://etf.sbimf.com/home/GetETFNAVDetailsAsync";
-    const res = await fetch(url, { headers: { "accept": "application/json" } });
+
+    const res = await fetch(url, {
+      headers: {
+        "accept": "application/json,text/plain,*/*",
+        "user-agent": "Mozilla/5.0",
+        "referer": "https://etf.sbimf.com/",
+        "origin": "https://etf.sbimf.com"
+      }
+    });
+
     if (!res.ok) throw new Error(`SBI iNAV fetch failed: HTTP ${res.status}`);
 
-    const j = await res.json();
+    // sometimes servers return HTML even with 200
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const text = await res.text();
+    if (!ct.includes("application/json")) {
+      throw new Error(`SBI iNAV not JSON (content-type=${ct})`);
+    }
+
+    const j = JSON.parse(text);
     const rows = Array.isArray(j?.Data) ? j.Data : [];
     if (!rows.length) throw new Error("SBI iNAV: empty Data");
 
