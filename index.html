@@ -2,704 +2,186 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Gold Decision Radar v3.1</title>
-  <meta name="description" content="Auto-fetch DXY, US 10Y Real Yield, USD/INR 30-day trend. Manual/Auto RSI, SETFGOLD price, and iNAV with override." />
-  <meta name="theme-color" content="#0b0f14" />
-  <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gold Decision Radar — Market Panel</title>
   <style>
-    :root{
-      --bg:#0b0f14;--muted:#94a3b8;--text:#e5e7eb;--line:#1f2937;
-      --radius:16px;--shadow:0 12px 30px rgba(0,0,0,.35);
-      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-      --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans","Liberation Sans",sans-serif;
+    :root { color-scheme: light; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 18px; }
+    .wrap { max-width: 880px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .status { font-size: 13px; margin: 8px 0 14px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+    .card { grid-column: span 12; border: 1px solid #ddd; border-radius: 12px; padding: 12px 12px 10px; }
+    @media (min-width: 740px) { .card { grid-column: span 6; } }
+    label { display: block; font-size: 12px; opacity: .8; margin-bottom: 6px; }
+    input, select, button {
+      width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 10px; font-size: 14px;
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      padding:18px;
-      padding-top:max(18px,env(safe-area-inset-top));
-      padding-bottom:max(18px,env(safe-area-inset-bottom));
-      background:
-        radial-gradient(1000px 500px at 10% -10%, rgba(96,165,250,.18), transparent 60%),
-        radial-gradient(900px 450px at 110% 10%, rgba(34,197,94,.14), transparent 60%),
-        var(--bg);
-      color:var(--text);
-      font-family:var(--sans);
-      line-height:1.35
-    }
-    .wrap{max-width:980px;margin:0 auto}
-    header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
-    h1{font-size:20px;margin:0 0 4px 0;letter-spacing:.2px}
-    .sub{color:var(--muted);font-size:13px;margin:0}
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      padding:16px
-    }
-    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
-    @media (max-width:860px){.grid{grid-template-columns:1fr}}
-    .inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    @media (max-width:520px){.inputs{grid-template-columns:1fr}}
-    .field{
-      background:rgba(15,23,42,.45);
-      border:1px solid rgba(148,163,184,.18);
-      border-radius:14px;
-      padding:12px
-    }
-    .label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-bottom:8px}
-    .label b{color:var(--text);font-weight:600}
-    input[type="number"],select{
-      width:100%;
-      border-radius:12px;
-      border:1px solid rgba(148,163,184,.24);
-      background:rgba(2,6,23,.55);
-      color:var(--text);
-      padding:12px;
-      font-size:15px;
-      outline:none
-    }
-    input[type="number"]:focus,select:focus{border-color:rgba(96,165,250,.7);box-shadow:0 0 0 4px rgba(96,165,250,.18)}
-    .hint{font-size:12px;color:var(--muted);margin-top:8px}
-    .panel{display:flex;flex-direction:column;gap:12px}
-    .result{
-      border-radius:18px;
-      padding:16px;
-      border:1px solid rgba(148,163,184,.18);
-      background:rgba(2,6,23,.35)
-    }
-    .badge{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:8px 12px;border-radius:999px;font-weight:800;
-      letter-spacing:.4px;text-transform:uppercase;font-size:12px;
-      border:1px solid rgba(148,163,184,.22);
-      background:rgba(0,0,0,.25)
-    }
-    .big{font-size:22px;margin:10px 0 6px 0;font-weight:900;letter-spacing:.2px}
-    .meta{color:rgba(255,255,255,.92);font-size:13px;margin:0}
-    .scoreline{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-    .chip{
-      background:rgba(255,255,255,0.15);
-      border:1px solid rgba(255,255,255,0.30);
-      border-radius:999px;
-      padding:8px 10px;
-      font-size:12px;
-      color:#ffffff
-    }
-    .chip code{font-family:var(--mono);font-size:12px;color:#ffffff}
-    .actions{display:flex;flex-wrap:wrap;gap:10px}
-    button{
-      border:1px solid rgba(148,163,184,.22);
-      background:rgba(15,23,42,.65);
-      color:var(--text);
-      border-radius:12px;
-      padding:10px 12px;
-      font-size:14px;
-      font-weight:750;
-      cursor:pointer
-    }
-    button.primary{border-color:rgba(96,165,250,.55);background:rgba(96,165,250,.12)}
-    button.danger{border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.10)}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .pill{
-      padding:6px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.16);
-      background:rgba(2,6,23,.25);font-size:12px
-    }
-    details{border:1px solid rgba(148,163,184,.16);background:rgba(2,6,23,.25);border-radius:14px;padding:12px}
-    summary{cursor:pointer;font-weight:750}
-    footer{margin-top:14px;color:var(--muted);font-size:12px}
-
-    /* USD/INR pill coloring */
-    .pill.inr-up  { border-color: rgba(239,68,68,.75) !important; color: rgba(254,202,202,1) !important; }
-    .pill.inr-down{ border-color: rgba(34,197,94,.75) !important; color: rgba(187,247,208,1) !important; }
-    .pill.inr-flat{ border-color: rgba(245,158,11,.75) !important; color: rgba(253,230,138,1) !important; }
-
-    /* Tooltip */
-    .pill[data-tip]{position:relative;cursor:help;-webkit-tap-highlight-color:transparent}
-    .pill[data-tip]::after{
-      content:attr(data-tip);
-      position:absolute;
-      left:0; top:calc(100% + 8px);
-      min-width:240px; max-width:320px;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(148,163,184,.22);
-      background:rgba(2,6,23,.95);
-      color:var(--text);
-      font-size:12px; line-height:1.35;
-      box-shadow:0 12px 30px rgba(0,0,0,.35);
-      opacity:0; transform:translateY(-4px);
-      pointer-events:none; z-index:50
-    }
-    .pill[data-tip]:hover::after,.pill[data-tip]:focus::after{opacity:1;transform:translateY(0)}
-
-    /* ===== BOLD DECISION ZONES (apply to #decisionPanel) ===== */
-    #decisionPanel.zone-buy  { background:#0f9d58; border:2px solid #0b6f3f; color:#fff; }
-    #decisionPanel.zone-hold { background:#f4b400; border:2px solid #c69500; color:#fff; }
-    #decisionPanel.zone-trim { background:#db4437; border:2px solid #a52714; color:#fff; }
-    #decisionPanel.zone-wait { background:#424242; border:2px solid #1f1f1f; color:#fff; }
-    #decisionPanel.zone-buy *,#decisionPanel.zone-hold *,#decisionPanel.zone-trim *,#decisionPanel.zone-wait *{ color:#fff !important; }
+    input[readonly] { background: #fafafa; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .meta { font-size: 12px; opacity: .7; margin-top: 8px; line-height: 1.35; }
+    .btnrow { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 740px) { .btnrow { grid-template-columns: 1fr 1fr 1fr; } }
+    .pill { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; font-size:12px; }
   </style>
 </head>
 
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Gold Decision Radar v3.1</h1>
-      <p class="sub"><b>Auto-fetch</b> DXY + Real Yield + USD/INR <b>30-day</b> trend. Auto/Manual toggles for Price, RSI, iNAV.</p>
+  <div class="wrap">
+    <h1>Gold Decision Radar — Market (Auto)</h1>
+    <div class="status" id="status">Status: idle</div>
+
+    <div class="btnrow">
+      <button id="btnFetch" type="button">Fetch now</button>
+      <button id="btnStart" type="button">Start auto (60s)</button>
+      <button id="btnStop" type="button">Stop auto</button>
     </div>
-    <div class="actions">
-      <button class="primary" id="btnRefresh">Auto-Fetch Now</button>
-      <button class="primary" id="btnSave">Save</button>
-      <button id="btnShare">Share</button>
-      <button class="danger" id="btnReset">Reset</button>
+
+    <div class="meta">
+      API: <span class="pill">/api/market</span> (front-end reads: <span class="pill">SETFGOLD price</span>, <span class="pill">RSI</span>, <span class="pill">USD/INR</span>, <span class="pill">DXY</span>, <span class="pill">Real Yield</span>)
     </div>
-  </header>
 
-  <div class="grid">
-    <section class="card">
-
-      <div class="row" style="margin-bottom:12px;">
-        <span class="pill" id="status">Status: ready</span>
-        <span class="pill" id="asOf">As of: —</span>
-        <span class="pill" id="fresh">Sources: —</span>
+    <div class="grid" style="margin-top:14px;">
+      <div class="card">
+        <label for="setfGoldPrice">SETFGOLD Market Price (₹)</label>
+        <input id="setfGoldPrice" readonly placeholder="—" />
+        <div class="meta">From: <span class="pill">setfGoldPrice</span></div>
       </div>
 
-      <!-- USD/INR Spot (auto only) -->
-      <div class="field" style="grid-column: 1 / -1; margin-bottom:12px;">
-        <div class="label"><b>USD/INR Spot</b></div>
-
-        <span class="pill" id="usdInrSpot"
-          tabindex="0"
-          data-tip="Legend: Red = USD/INR ↑ (INR weakening), Green = USD/INR ↓ (INR strengthening), Yellow = flat/range-bound (±0.2%).">
-          USD/INR Spot: —
-        </span>
-
-        <div class="hint">
-          Rule: INR weakening (USD/INR ↑) = +1 • Stable = 0 • INR strengthening (USD/INR ↓) = −1.
-        </div>
+      <div class="card">
+        <label for="rsi14">RSI(14) — SETFGOLD</label>
+        <input id="rsi14" readonly placeholder="—" />
+        <div class="meta">From: <span class="pill">rsi14Setfgold</span></div>
       </div>
 
-      <!-- RSI (auto + manual override) -->
-      <div class="field" style="grid-column: 1 / -1;">
-        <div class="label">
-          <b>RSI (14) – SETFGOLD</b>
-          <span id="rsiScore" class="pill">Score: 0</span>
-        </div>
-
-        <div class="row" style="margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
-            <input type="checkbox" id="useManualRsi" />
-            Manual override
-          </label>
-          <span class="pill" id="autoRsiPill">Auto: —</span>
-        </div>
-
-        <input type="number" id="rsi14" step="0.1" inputmode="decimal"
-               placeholder="Auto-filled (enable Manual override to edit)" readonly />
-
-        <div class="hint">
-          Rule: RSI &lt; 30 = +1 (oversold) • 30–70 = 0 • &gt; 70 = −1 (overbought)
+      <div class="card">
+        <label for="usdInr">USD/INR Spot</label>
+        <input id="usdInr" readonly placeholder="—" />
+        <div class="meta">
+          From: <span class="pill">usdInr</span>
+          &nbsp;| 30d%: <span id="usdInr30d" class="pill">—</span>
+          &nbsp;| Trend: <span id="usdInrTrend" class="pill">—</span>
         </div>
       </div>
 
-      <!-- SETFGOLD Price (auto + manual override) -->
-      <div class="field" style="grid-column: 1 / -1;">
-        <div class="label">
-          <b>SETFGOLD Market Price (₹)</b>
-          <span id="pxScore" class="pill">Score: 0</span>
-        </div>
-
-        <div class="row" style="margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
-            <input type="checkbox" id="useManualPrice" />
-            Manual override
-          </label>
-          <span class="pill" id="autoPricePill">Auto: —</span>
-        </div>
-
-        <input type="number" id="setfPrice" step="0.01" inputmode="decimal"
-               placeholder="Auto-filled (enable Manual override to edit)" readonly />
-
-        <div class="hint">
-          Rule: Compared with iNAV → Discount ≤ −0.30% = +1 • ±0.30% = 0 • Premium ≥ +0.30% = −1
-        </div>
+      <div class="card">
+        <label for="dxy">DXY</label>
+        <input id="dxy" readonly placeholder="—" />
+        <div class="meta">From: <span class="pill">dxy</span></div>
       </div>
 
-      <!-- iNAV (auto + manual override) -->
-      <div class="field" style="grid-column: 1 / -1;">
-        <div class="label">
-          <b>SBI Gold ETF iNAV (₹)</b>
-          <span id="inavScore" class="pill">Score: 0</span>
-        </div>
-
-        <div class="row" style="margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
-            <input type="checkbox" id="useManualInav" />
-            Manual override
-          </label>
-          <span class="pill" id="autoInavPill">Auto: —</span>
-        </div>
-
-        <input type="number" id="sbiInav" step="0.0001" inputmode="decimal"
-               placeholder="Auto-filled (enable Manual override to edit)" readonly />
-
-        <div class="hint" id="sbiInavRule">
-          Rule: Discount ≤ −0.30% = +1 • ±0.30% = 0 • Premium ≥ +0.30% = −1
-        </div>
-        <div class="hint" id="sbiInavAsOf">As of: —</div>
+      <div class="card">
+        <label for="realYield">US 10Y Real Yield</label>
+        <input id="realYield" readonly placeholder="—" />
+        <div class="meta">From: <span class="pill">realYield</span> (FRED DFII10)</div>
       </div>
 
-      <!-- Other factors -->
-      <div class="inputs">
-
-        <div class="field">
-          <div class="label"><b>DXY</b></div>
-          <input type="number" id="dxy" step="0.01" inputmode="decimal" placeholder="Auto-fetched (info)" />
-          <div class="hint">Info only (not used in score).</div>
+      <div class="card">
+        <label for="asOf">As of (API)</label>
+        <input id="asOf" readonly placeholder="—" />
+        <div class="meta">
+          Errors: <span id="errCount" class="pill">0</span>
+          <div id="errList" class="meta" style="margin-top:8px;"></div>
         </div>
-
-        <div class="field">
-          <div class="label"><b>US 10Y Real Yield (%)</b></div>
-          <input type="number" id="realYield" step="0.01" inputmode="decimal" placeholder="Auto-fetched (info)" />
-          <div class="hint">Info only (not used in score).</div>
-        </div>
-
-        <div class="field">
-          <div class="label"><b>Fed Tone (last 30 days)</b><span id="fedScore" class="pill">Score: 0</span></div>
-          <select id="fedTone">
-            <option value="cuts_likely">Rate cuts likely / dovish</option>
-            <option value="neutral" selected>Neutral / mixed</option>
-            <option value="hawkish">Cuts delayed / hawkish</option>
-          </select>
-          <div class="hint">Rule: Dovish / cuts likely = +1 • Neutral = 0 • Hawkish = −1</div>
-        </div>
-
-        <div class="field">
-          <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Score: 0</span></div>
-          <select id="geoRisk">
-            <option value="crisis">War / crisis escalating</option>
-            <option value="normal" selected>Normal</option>
-            <option value="fading">Risk fading / calming</option>
-          </select>
-          <div class="hint">Rule: Crisis / escalation = +1 • Normal = 0 • Risk fading = −1</div>
-        </div>
-
-        <div class="field" style="grid-column: 1 / -1;">
-          <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Score: 0</span></div>
-          <select id="inrTrend">
-            <option value="weakening">INR weakening (USD/INR rising)</option>
-            <option value="stable" selected>Stable / range-bound</option>
-            <option value="strengthening">INR strengthening (USD/INR falling)</option>
-          </select>
-          <div class="hint">Rule: INR weakening = +1 • Stable = 0 • INR strengthening = −1</div>
-        </div>
-
       </div>
-
-      <details style="margin-top:12px;">
-        <summary>Install on iPhone</summary>
-        <div class="hint" style="margin-top:8px;">
-          <ol>
-            <li>Deploy on Cloudflare Pages.</li>
-            <li>Open the URL in <b>Safari</b> on your iPhone.</li>
-            <li>Share → <b>Add to Home Screen</b>.</li>
-          </ol>
-        </div>
-      </details>
-    </section>
-
-    <aside class="card panel">
-      <div class="result zone-wait" id="decisionPanel" aria-live="polite">
-        <span class="badge" id="badge">WAIT</span>
-        <div class="big" id="headline">Fill inputs → WAIT</div>
-        <p class="meta" id="explain">Auto-fetch or enter manual values.</p>
-        <div class="scoreline" id="chips"></div>
-      </div>
-
-      <details>
-        <summary>Decision logic</summary>
-        <div class="hint" style="margin-top:8px;">
-          Uses: USD/INR Trend + RSI(14) + Price vs iNAV + Fed + Geo<br/>
-          Score ≥ +2 → BUY • −1 to +1 → HOLD • ≤ −2 → TRIM
-        </div>
-      </details>
-    </aside>
+    </div>
   </div>
 
-  <footer>Offline: app shell cached. If network is down, it uses last saved values.</footer>
-</div>
+  <script>
+    // Tiny helper
+    const $ = (id) => document.getElementById(id);
 
-<script>
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+    // --- AutoFetch: ONLY these 5 values ---
+    // Reads: setfGoldPrice, rsi14Setfgold, usdInr, dxy, realYield
+    async function autoFetch({ inavOff = true } = {}) {
+      const statusEl = $("status");
 
-  const $ = (id) => document.getElementById(id);
-  const storageKey = "goldDecisionRadar:v31";
+      const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
 
-  const round1 = (x)=> Math.round(x*10)/10;
-  const toNum = (v)=> { const n=parseFloat(v); return Number.isFinite(n)?n:null; };
+      const setField = (id, value) => {
+        const el = $(id);
+        if (!el) return;
+        if ("value" in el) el.value = value;
+        else el.textContent = value;
+      };
 
-  // ===== AUTO STATE (filled by /api/market) =====
-  const AUTO = { price: null, rsi14: null, inav: null };
+      const fmt = { num: (v, digits) => (Number.isFinite(v) ? v.toFixed(digits) : "—") };
 
-  function setManualMode(checkboxId, inputId, autoValue) {
-    const cb = $(checkboxId);
-    const input = $(inputId);
-    if (!cb || !input) return;
-    const manual = cb.checked;
-    input.readOnly = !manual;
-    if (!manual && Number.isFinite(autoValue)) input.value = String(autoValue);
-  }
+      setStatus("Status: fetching…");
 
-  // ---- Scores (match UI rules) ----
-  function scoreFed(t){ return t==="cuts_likely"?1:(t==="hawkish"?-1:0); }
-  function scoreGeo(g){ return g==="crisis"?1:(g==="fading"?-1:0); }
-  function scoreINR(t){ return t==="weakening"?1:(t==="strengthening"?-1:0); }
+      try {
+        const endpoint = inavOff ? "/api/market?inav=off" : "/api/market";
+        const res = await fetch(endpoint, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  // RSI: <30 +1, 30–70 0, >70 −1
-  function scoreRSI(rsi){
-    if(!Number.isFinite(rsi)) return 0;
-    if(rsi < 30) return 1;
-    if(rsi > 70) return -1;
-    return 0;
-  }
+        const data = await res.json();
 
-  // Price vs iNAV premium/discount:
-  // premiumPct = ((price - inav) / inav) * 100
-  // <= -0.30% => +1, within ±0.30% => 0, >= +0.30% => -1
-  function scorePremium(price, inav){
-    if(!Number.isFinite(price) || !Number.isFinite(inav) || inav === 0) return {score: 0, premiumPct: null};
-    const premiumPct = ((price - inav) / inav) * 100;
-    let score = 0;
-    if (premiumPct <= -0.30) score = 1;
-    else if (premiumPct >= 0.30) score = -1;
-    return {score, premiumPct};
-  }
+        // Parse & guard
+        const setfGoldPrice = Number(data?.setfGoldPrice);
+        const rsi14 = Number(data?.rsi14Setfgold);
+        const usdInr = Number(data?.usdInr);
+        const dxy = Number(data?.dxy);
+        const realYield = Number(data?.realYield);
 
-  function applyDecisionZone(zone){
-    const panel = $("decisionPanel");
-    if (!panel) return;
-    panel.classList.remove("zone-buy","zone-hold","zone-trim","zone-wait");
-    panel.classList.add(zone);
-  }
+        // Write ONLY these 5 to main inputs
+        setField("setfGoldPrice", fmt.num(setfGoldPrice, 2));
+        setField("rsi14", fmt.num(rsi14, 1));
+        setField("usdInr", fmt.num(usdInr, 4));
+        setField("dxy", fmt.num(dxy, 2));
+        setField("realYield", fmt.num(realYield, 2));
 
-  function compute(){
-    const fed = $("fedTone")?.value ?? "";
-    const geo = $("geoRisk")?.value ?? "";
-    const inr = $("inrTrend")?.value ?? "";
+        // Optional supporting display (still aligned with market.js response)
+        setField("usdInr30d", Number.isFinite(Number(data?.usdInrChangePct30d)) ? `${Number(data.usdInrChangePct30d).toFixed(2)}%` : "—");
+        setField("usdInrTrend", data?.usdInrTrend ? String(data.usdInrTrend) : "—");
 
-    const useManualPrice = $("useManualPrice")?.checked ?? false;
-    const useManualRsi   = $("useManualRsi")?.checked ?? false;
-    const useManualInav  = $("useManualInav")?.checked ?? false;
+        setField("asOf", data?.asOf ? String(data.asOf) : "—");
 
-    const rsi = useManualRsi ? toNum($("rsi14")?.value ?? "") : (Number.isFinite(AUTO.rsi14) ? AUTO.rsi14 : null);
-    const price = useManualPrice ? toNum($("setfPrice")?.value ?? "") : (Number.isFinite(AUTO.price) ? AUTO.price : null);
-    const inav = useManualInav ? toNum($("sbiInav")?.value ?? "") : (Number.isFinite(AUTO.inav) ? AUTO.inav : null);
+        const errors = Array.isArray(data?.errors) ? data.errors : [];
+        setField("errCount", String(errors.length));
 
-    const missing = [];
-    if (!inr) missing.push("USD/INR trend");
-    if (rsi === null) missing.push("RSI(14)");
-    if (price === null) missing.push("SETFGOLD price");
-    if (inav === null) missing.push("SBI iNAV");
-    if (!fed) missing.push("Fed tone");
-    if (!geo) missing.push("Geopolitics");
+        const errListEl = $("errList");
+        if (errListEl) {
+          errListEl.innerHTML = errors.length
+            ? "<b>Warnings:</b><ul style='margin:6px 0 0 18px; padding:0;'>" +
+              errors.map(e => `<li>${escapeHtml(String(e))}</li>`).join("") +
+              "</ul>"
+            : "";
+        }
 
-    // Score pills always safe
-    if ($("fedScore")) $("fedScore").textContent = `Score: ${scoreFed(fed)}`;
-    if ($("geoScore")) $("geoScore").textContent = `Score: ${scoreGeo(geo)}`;
-    if ($("inrScore")) $("inrScore").textContent = `Score: ${scoreINR(inr)}`;
-    if ($("rsiScore")) $("rsiScore").textContent = `Score: ${Number.isFinite(rsi) ? scoreRSI(rsi) : 0}`;
-
-    if (missing.length){
-      if ($("pxScore")) $("pxScore").textContent = `Score: 0`;
-      if ($("inavScore")) $("inavScore").textContent = `Score: 0`;
-
-      if ($("badge")) $("badge").textContent = "WAIT";
-      if ($("headline")) $("headline").textContent = "Fill inputs → WAIT";
-      if ($("explain")) $("explain").textContent = `Fill: ${missing.join(", ")}`;
-      applyDecisionZone("zone-wait");
-
-      const boxWait = $("chips");
-if (boxWait) {
-  boxWait.innerHTML = "";
-  [
-    ["USD/INR", inr || "—", scoreINR(inr)],
-    ["Fed", (fed ? fed.replaceAll("_"," ") : "—"), scoreFed(fed)],
-    ["Geo", geo || "—", scoreGeo(geo)],
-    ["RSI14", ($("rsi14")?.value || "—"), Number.isFinite(rsi) ? scoreRSI(rsi) : 0],
-    ["SETFGOLD Px", ($("setfPrice")?.value || "—"), 0],
-    ["SBI iNAV", ($("sbiInav")?.value || "—"), 0]
-  ].forEach(([n, v, s]) => {
-    const el = document.createElement("div");
-    el.className = "chip";
-    el.innerHTML = `${n}: <code>${v}</code> • <b>${s}</b>`;
-    boxWait.appendChild(el);
-  });
-}
-      return { total: null, label: "WAIT" };
-    }
-
-    const sFed = scoreFed(fed);
-    const sGeo = scoreGeo(geo);
-    const sInr = scoreINR(inr);
-    const sRsi = scoreRSI(rsi);
-
-    const prem = scorePremium(price, inav);
-    const sVal = prem.score;
-
-    const total = round1(sInr + sRsi + sVal + sFed + sGeo);
-
-    if ($("pxScore")) $("pxScore").textContent = `Score: ${sVal}`;
-    if ($("inavScore")) $("inavScore").textContent = `Score: ${sVal}`;
-
-    let action="HOLD", label="HOLD / SIP LIGHT", exp="Mixed signals / no edge.", zone="zone-hold";
-    if (total >= 2) { action="BUY"; label="BUY / ACCUMULATE"; exp="Tailwinds aligned."; zone="zone-buy"; }
-    else if (total <= -2) { action="TRIM"; label="TRIM / WAIT"; exp="Headwinds / premium / overbought risk."; zone="zone-trim"; }
-
-    if ($("badge")) $("badge").textContent = action;
-    if ($("headline")) $("headline").textContent = `Score: ${total.toFixed(1)} → ${label}`;
-    if ($("explain")) $("explain").textContent = exp;
-    applyDecisionZone(zone);
-
-    const premText = (prem.premiumPct === null)
-      ? "—"
-      : `${prem.premiumPct >= 0 ? "+" : ""}${prem.premiumPct.toFixed(2)}% ${prem.premiumPct > 0 ? "premium" : "discount"}`;
-
-    const box = $("chips");
-    if (box) {
-      box.innerHTML = "";
-      const items = [
-        ["USD/INR", inr, sInr],
-        ["RSI14", rsi.toFixed(1), sRsi],
-        ["Px vs iNAV", premText, sVal],
-        ["Fed", fed.replaceAll("_"," "), sFed],
-        ["Geo", geo, sGeo],
-        ["SETFGOLD Px", price.toFixed(2), 0],
-        ["SBI iNAV", inav.toFixed(4), 0]
-      ];
-      items.forEach(([n,v,s])=>{
-        const el=document.createElement("div");
-        el.className="chip";
-        el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
-        box.appendChild(el);
-      });
-    }
-
-    return { total, label };
-  }
-
-  function save(){
-    const payload={
-      // info fields
-      dxy:$("dxy")?.value ?? "",
-      realYield:$("realYield")?.value ?? "",
-
-      // dropdowns
-      fedTone:$("fedTone")?.value ?? "neutral",
-      geoRisk:$("geoRisk")?.value ?? "normal",
-      inrTrend:$("inrTrend")?.value ?? "stable",
-
-      // manual inputs stored
-      rsi14:$("rsi14")?.value ?? "",
-      setfPrice:$("setfPrice")?.value ?? "",
-      sbiInav:$("sbiInav")?.value ?? "",
-      sbiInavAsOf:$("sbiInavAsOf")?.textContent ?? "",
-
-      // toggles
-      useManualPrice:$("useManualPrice")?.checked ?? false,
-      useManualRsi:$("useManualRsi")?.checked ?? false,
-      useManualInav:$("useManualInav")?.checked ?? false,
-
-      // meta
-      asOf:$("asOf")?.textContent ?? "",
-      fresh:$("fresh")?.textContent ?? "",
-      lastSavedISO:new Date().toISOString()
-    };
-    localStorage.setItem(storageKey, JSON.stringify(payload));
-    if ($("btnSave")) {
-      $("btnSave").textContent="Saved ✓";
-      setTimeout(()=> $("btnSave").textContent="Save", 900);
-    }
-  }
-
-  function load(){
-    try{
-      const raw=localStorage.getItem(storageKey);
-      if(!raw) return false;
-      const d=JSON.parse(raw);
-
-      if($("dxy") && d.dxy!=null) $("dxy").value=d.dxy;
-      if($("realYield") && d.realYield!=null) $("realYield").value=d.realYield;
-
-      if($("fedTone") && d.fedTone) $("fedTone").value=d.fedTone;
-      if($("geoRisk") && d.geoRisk) $("geoRisk").value=d.geoRisk;
-      if($("inrTrend") && d.inrTrend) $("inrTrend").value=d.inrTrend;
-
-      if($("rsi14") && d.rsi14!=null) $("rsi14").value=d.rsi14;
-      if($("setfPrice") && d.setfPrice!=null) $("setfPrice").value=d.setfPrice;
-      if($("sbiInav") && d.sbiInav!=null) $("sbiInav").value=d.sbiInav;
-      if($("sbiInavAsOf") && d.sbiInavAsOf!=null) $("sbiInavAsOf").textContent=d.sbiInavAsOf;
-
-      if($("useManualPrice")) $("useManualPrice").checked = !!d.useManualPrice;
-      if($("useManualRsi")) $("useManualRsi").checked = !!d.useManualRsi;
-      if($("useManualInav")) $("useManualInav").checked = !!d.useManualInav;
-
-      if($("asOf") && d.asOf) $("asOf").textContent=d.asOf;
-      if($("fresh") && d.fresh) $("fresh").textContent=d.fresh;
-
-      return true;
-    }catch(e){ return false; }
-  }
-
-  function resetAll(){
-    localStorage.removeItem(storageKey);
-
-    if($("dxy")) $("dxy").value="";
-    if($("realYield")) $("realYield").value="";
-    if($("fedTone")) $("fedTone").value="neutral";
-    if($("geoRisk")) $("geoRisk").value="normal";
-    if($("inrTrend")) $("inrTrend").value="stable";
-
-    if ($("useManualPrice")) $("useManualPrice").checked=false;
-    if ($("useManualRsi")) $("useManualRsi").checked=false;
-    if ($("useManualInav")) $("useManualInav").checked=false;
-
-    if ($("rsi14")) $("rsi14").value="";
-    if ($("setfPrice")) $("setfPrice").value="";
-    if ($("sbiInav")) $("sbiInav").value="";
-    if ($("sbiInavAsOf")) $("sbiInavAsOf").textContent="As of: —";
-
-    if($("asOf")) $("asOf").textContent="As of: —";
-    if($("fresh")) $("fresh").textContent="Sources: —";
-    if($("status")) $("status").textContent="Status: ready";
-
-    AUTO.price=null; AUTO.rsi14=null; AUTO.inav=null;
-    if ($("autoPricePill")) $("autoPricePill").textContent="Auto: —";
-    if ($("autoRsiPill")) $("autoRsiPill").textContent="Auto: —";
-    if ($("autoInavPill")) $("autoInavPill").textContent="Auto: —";
-
-    setManualMode("useManualPrice","setfPrice",AUTO.price);
-    setManualMode("useManualRsi","rsi14",AUTO.rsi14);
-    setManualMode("useManualInav","sbiInav",AUTO.inav);
-
-    applyDecisionZone("zone-wait");
-    compute();
-  }
-
-  async function share(){
-    const r=compute();
-    const text=`Gold Radar v3.1\n${r.total===null?"WAIT (missing inputs)":("Score: "+r.total.toFixed(1)+" → "+r.label)}`;
-    try{
-      if(navigator.share) await navigator.share({title:"Gold Radar", text});
-      else { await navigator.clipboard.writeText(text); alert("Copied."); }
-    }catch(e){}
-  }
-
-  // PATCH: replace your formatSources() with this (adds RSI + SBI iNAV)
-
-function formatSources(f){
-  const parts=[];
-  if(f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
-  if(f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
-  if(f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
-  if(f?.rsi?.provider) parts.push(`RSI:${f.rsi.provider}`);
-  if(f?.sbiInav?.provider) parts.push(`SBI:${f.sbiInav.provider}`);
-  return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
-}
- 
-
-async function autoFetch(){
-  if ($("status")) $("status").textContent = "Status: fetching…";
-
-  try{
-     const res = await fetch("/api/market?inav=off", { cache: "no-store" });
-if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-const data = await res.json(); //
-
-    // Core (auto)
-    if ($("dxy") && Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
-    if ($("realYield") && Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
-    if ($("inrTrend") && data.usdInrTrend) $("inrTrend").value = data.usdInrTrend;
-
-    // USD/INR spot pill + 30d change + color
-    if ($("usdInrSpot") && Number.isFinite(data.usdInr)) {
-      const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
-
-      let arrow = "→";
-      let cls = "inr-flat";
-      if (pct !== null) {
-        if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
-        else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
+        setStatus(errors.length ? `Status: fetched (with ${errors.length} warning${errors.length > 1 ? "s" : ""})` : "Status: fetched ✅");
+      } catch (e) {
+        console.error("autoFetch error:", e);
+        setStatus(`Status: fetch failed ❌ (${String(e?.message || e)})`);
       }
-
-      const pctText = (pct === null)
-        ? ""
-        : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
-
-      const el = $("usdInrSpot");
-      el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
-      el.classList.remove("inr-up","inr-down","inr-flat");
-      el.classList.add(cls);
     }
 
-    // Meta
-    if ($("asOf")) $("asOf").textContent = `As of: ${data.asOf || "—"}`;
-    if ($("fresh")) $("fresh").textContent = formatSources(data.freshness);
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
 
-    if ($("status")) $("status").textContent = "Status: fetched ✓";
+    // Optional polling wrapper
+    let _autoFetchTimer = null;
 
-    compute();
-    save();
+    function startAutoFetch(intervalMs = 60000, opts = { inavOff: true }) {
+      stopAutoFetch();
+      autoFetch(opts); // immediate
+      _autoFetchTimer = setInterval(() => autoFetch(opts), intervalMs);
+    }
 
-  } catch(e){
-    if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
-    compute();
-  }
-}
+    function stopAutoFetch() {
+      if (_autoFetchTimer) clearInterval(_autoFetchTimer);
+      _autoFetchTimer = null;
+    }
 
-  // ---- Listeners ----
-  ["dxy","realYield","fedTone","geoRisk","inrTrend","rsi14","setfPrice","sbiInav"].forEach(id=>{
-    const el = $(id);
-    if(!el) return;
-    el.addEventListener("input", ()=>{ compute(); });
-    el.addEventListener("change", ()=>{ compute(); });
-  });
+    // Wire buttons
+    $("btnFetch").addEventListener("click", () => autoFetch({ inavOff: true }));
+    $("btnStart").addEventListener("click", () => startAutoFetch(60000, { inavOff: true }));
+    $("btnStop").addEventListener("click", () => stopAutoFetch());
 
-  ["useManualPrice","useManualRsi","useManualInav"].forEach(id=>{
-    const cb = $(id);
-    if(!cb) return;
-    cb.addEventListener("change", () => {
-      setManualMode("useManualPrice","setfPrice",AUTO.price);
-      setManualMode("useManualRsi","rsi14",AUTO.rsi14);
-      setManualMode("useManualInav","sbiInav",AUTO.inav);
-      compute();
-      save();
-    });
-  });
-
-  $("btnSave")?.addEventListener("click", save);
-  $("btnReset")?.addEventListener("click", ()=>{ if(confirm("Reset all values?")) resetAll(); });
-  $("btnShare")?.addEventListener("click", share);
-  $("btnRefresh")?.addEventListener("click", autoFetch);
-
-  // ---- Boot ----
-  const hadSaved = load();
-
-  // Apply readonly state immediately on load
-  setManualMode("useManualPrice","setfPrice",AUTO.price);
-  setManualMode("useManualRsi","rsi14",AUTO.rsi14);
-  setManualMode("useManualInav","sbiInav",AUTO.inav);
-
-  compute();
-  if(!hadSaved) autoFetch();
-</script>
+    // Optional: auto start once on load
+    autoFetch({ inavOff: true });
+  </script>
 </body>
 </html>
