@@ -426,24 +426,23 @@
       if ($("explain")) $("explain").textContent = `Fill: ${missing.join(", ")}`;
       applyDecisionZone("zone-wait");
 
-      const box = $("chips");
-      if (box) {
-        box.innerHTML = "";
-        const items = [
-          ["USD/INR", inr || "—", scoreINR(inr)],
-          ["Fed", fed ? fed.replaceAll("_"," ") : "—", scoreFed(fed)],
-          ["Geo", geo || "—", scoreGeo(geo)],
-          ["RSI14", $("rsi14")?.value || "—", Number.isFinite(rsi)?scoreRSI(rsi):0],
-          ["SETFGOLD Px", $("setfPrice")?.value || "—", 0],
-          ["SBI iNAV", $("sbiInav")?.value || "—", 0]
-        ];
-        items.forEach(([n,v,s])=>{
-          const el=document.createElement("div");
-          el.className="chip";
-          el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
-          box.appendChild(el);
-        });
-      }
+      const boxWait = $("chips");
+if (boxWait) {
+  boxWait.innerHTML = "";
+  [
+    ["USD/INR", inr || "—", scoreINR(inr)],
+    ["Fed", (fed ? fed.replaceAll("_"," ") : "—"), scoreFed(fed)],
+    ["Geo", geo || "—", scoreGeo(geo)],
+    ["RSI14", ($("rsi14")?.value || "—"), Number.isFinite(rsi) ? scoreRSI(rsi) : 0],
+    ["SETFGOLD Px", ($("setfPrice")?.value || "—"), 0],
+    ["SBI iNAV", ($("sbiInav")?.value || "—"), 0]
+  ].forEach(([n, v, s]) => {
+    const el = document.createElement("div");
+    el.className = "chip";
+    el.innerHTML = `${n}: <code>${v}</code> • <b>${s}</b>`;
+    boxWait.appendChild(el);
+  });
+}
       return { total: null, label: "WAIT" };
     }
 
@@ -603,104 +602,68 @@
     }catch(e){}
   }
 
-  function formatSources(f){
-    const parts=[];
-    if(f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
-    if(f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
-    if(f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
-    if(f?.rsi?.provider) parts.push(`RSI:${f.rsi.provider}`);
-    if(f?.sbiInav?.provider) parts.push(`SBI:${f.sbiInav.provider}`);
-    return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
-  }
+  // PATCH: replace your formatSources() with this (adds RSI + SBI iNAV)
 
-  async function autoFetch(){
-    if ($("status")) $("status").textContent = "Status: fetching…";
-    try{
-      const res = await fetch("/api/market", { cache: "no-store" });
-      if(!res.ok) throw new Error(res.status);
-      const data = await res.json();
+function formatSources(f){
+  const parts=[];
+  if(f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
+  if(f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
+  if(f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
+  if(f?.rsi?.provider) parts.push(`RSI:${f.rsi.provider}`);
+  if(f?.sbiInav?.provider) parts.push(`SBI:${f.sbiInav.provider}`);
+  return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
+}
+ 
 
-      // Info fields (auto)
-      if ($("dxy") && Number.isFinite(data?.dxy)) $("dxy").value = Number(data.dxy).toFixed(2);
-      if ($("realYield") && Number.isFinite(data?.realYield)) $("realYield").value = Number(data.realYield).toFixed(2);
-      if (data?.usdInrTrend && $("inrTrend")) $("inrTrend").value = data.usdInrTrend;
+async function autoFetch(){
+  if ($("status")) $("status").textContent = "Status: fetching…";
 
-      // USD/INR Spot + 30d change + color
-      if (Number.isFinite(data?.usdInr)) {
-        const pct = Number.isFinite(data?.usdInrChangePct30d) ? Number(data.usdInrChangePct30d) : null;
+  try{
+    const res = await fetch("/api/market", { cache: "no-store" });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        let arrow = "→";
-        let cls = "inr-flat";
-        if (pct !== null) {
-          if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
-          else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
-        }
+    const data = await res.json();
 
-        const pctText = (pct === null) ? "" : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
-        const el = $("usdInrSpot");
-        if (el) {
-          el.textContent = `USD/INR Spot: ${Number(data.usdInr).toFixed(2)}${pctText}`;
-          el.classList.remove("inr-up","inr-down","inr-flat");
-          el.classList.add(cls);
-        }
+    // Core (auto)
+    if ($("dxy") && Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
+    if ($("realYield") && Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
+    if ($("inrTrend") && data.usdInrTrend) $("inrTrend").value = data.usdInrTrend;
+
+    // USD/INR spot pill + 30d change + color
+    if ($("usdInrSpot") && Number.isFinite(data.usdInr)) {
+      const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
+
+      let arrow = "→";
+      let cls = "inr-flat";
+      if (pct !== null) {
+        if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
+        else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
       }
 
-      // --- Auto values (supports NEW keys + OLD fallback keys) ---
-      const autoPrice = toNum(
-        data?.setfGold?.autoPrice ??
-        data?.setfGoldPrice ??
-        data?.setfPrice ??
-        null
-      );
-      const autoRsi = toNum(
-        data?.rsi?.autoRsi14 ??
-        data?.rsi14Setfgold ??
-        data?.rsi14 ??
-        null
-      );
-      const autoInav = toNum(
-        data?.inav?.autoInav ??
-        data?.sbiGoldEtfInav ??
-        data?.sbiInav ??
-        null
-      );
-      const autoInavAsOf =
-        data?.inav?.autoInavAsOf ??
-        data?.sbiGoldEtfInavAsOf ??
-        null;
+      const pctText = (pct === null)
+        ? ""
+        : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
 
-      AUTO.price = Number.isFinite(autoPrice) ? autoPrice : null;
-      AUTO.rsi14 = Number.isFinite(autoRsi) ? autoRsi : null;
-      AUTO.inav  = Number.isFinite(autoInav) ? autoInav : null;
-
-      if ($("autoPricePill")) $("autoPricePill").textContent = `Auto: ${AUTO.price==null ? "—" : AUTO.price.toFixed(2)}`;
-      if ($("autoRsiPill"))   $("autoRsiPill").textContent   = `Auto: ${AUTO.rsi14==null ? "—" : AUTO.rsi14.toFixed(1)}`;
-      if ($("autoInavPill"))  $("autoInavPill").textContent  = `Auto: ${AUTO.inav==null ? "—" : AUTO.inav.toFixed(4)}`;
-
-      if ($("sbiInavAsOf")) $("sbiInavAsOf").textContent = `As of: ${autoInavAsOf || "—"}`;
-
-      // If override is OFF, snap inputs to auto (read-only)
-      if ($("setfPrice") && !($("useManualPrice")?.checked) && AUTO.price != null) $("setfPrice").value = AUTO.price.toFixed(2);
-      if ($("rsi14") && !($("useManualRsi")?.checked) && AUTO.rsi14 != null) $("rsi14").value = AUTO.rsi14.toFixed(1);
-      if ($("sbiInav") && !($("useManualInav")?.checked) && AUTO.inav != null) $("sbiInav").value = AUTO.inav.toFixed(4);
-
-      // Apply readonly state (in case toggles exist)
-      setManualMode("useManualPrice","setfPrice",AUTO.price);
-      setManualMode("useManualRsi","rsi14",AUTO.rsi14);
-      setManualMode("useManualInav","sbiInav",AUTO.inav);
-
-      // Meta
-      if($("asOf")) $("asOf").textContent = `As of: ${data?.asOf || "—"}`;
-      if($("fresh")) $("fresh").textContent = formatSources(data?.freshness);
-
-      if ($("status")) $("status").textContent = "Status: fetched ✓";
-      compute();
-      save();
-    } catch(e) {
-      if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
-      compute();
+      const el = $("usdInrSpot");
+      el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
+      el.classList.remove("inr-up","inr-down","inr-flat");
+      el.classList.add(cls);
     }
+
+    // Meta
+    if ($("asOf")) $("asOf").textContent = `As of: ${data.asOf || "—"}`;
+    if ($("fresh")) $("fresh").textContent = formatSources(data.freshness);
+
+    if ($("status")) $("status").textContent = "Status: fetched ✓";
+
+    compute();
+    save();
+
+  } catch(e){
+    if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
+    compute();
   }
+}
 
   // ---- Listeners ----
   ["dxy","realYield","fedTone","geoRisk","inrTrend","rsi14","setfPrice","sbiInav"].forEach(id=>{
