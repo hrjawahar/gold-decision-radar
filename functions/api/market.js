@@ -147,13 +147,16 @@ async function getSetfGoldPriceSafe(symbol) {
       asOf: new Date().toISOString(),
       source: { provider: "yahoo", symbol }
     };
-  } catch (e) {
-    return {
-      value: null,
-      asOf: null,
-      source: { provider: "yahoo", symbol, note: "price_fetch_failed" }
-    };
-  }
+ } catch (e) {
+  return {
+    value: null,
+    asOf: null,
+    source: {
+      provider: "sbimf",
+      endpoint: "/home/GetETFNAVDetailsAsync",
+      note: `inav_fetch_failed:${String(e?.message || e)}`
+    }
+  };
 }
 
 /* ======================= RSI(14) (AUTO) ======================= */
@@ -176,8 +179,11 @@ async function getRsi14Safe(symbol) {
 async function fetchYahooCloses(symbol, range = "3mo", interval = "1d") {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
   const res = await fetch(url, { headers: { "user-agent": "Mozilla/5.0", "accept": "application/json,text/plain,*/*" } });
-  if (!res.ok) throw new Error(`Yahoo closes failed for ${symbol}: HTTP ${res.status}`);
-  const j = await res.json();
+if (!res1.ok) {
+  const ct = res1.headers.get("content-type") || "";
+  const body = await res1.text().catch(()=> "");
+  throw new Error(`GET HTTP ${res1.status} ct=${ct} body=${body.slice(0,120)}`);
+}  const j = await res.json();
   const result = j?.chart?.result?.[0];
   if (!result) throw new Error(`Yahoo closes parse failed for ${symbol}`);
 
