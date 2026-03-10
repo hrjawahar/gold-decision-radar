@@ -222,6 +222,12 @@
           </select>
           <div class="hint">Shown as context only. Not included in core India weighted score.</div>
         </div>
+        <div class="field">
+  <div class="label"><b>Fed Auto Signal</b><span id="fedAutoScore" class="pill">Auto</span></div>
+  <div class="hint" id="fedAutoText">Signal: —</div>
+  <div class="hint" id="fedAutoAsOf">As of: —</div>
+  <div class="hint" id="fedAutoSource">Source: —</div>
+</div>
 
         <div class="field">
           <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Weight: 10%</span></div>
@@ -311,6 +317,12 @@
     if(v === "hawkish") return "Hawkish";
     return "Neutral";
   }
+  function fedSignalLabel(v){
+  if(v === "cuts_likely") return "Cuts likely / dovish";
+  if(v === "hawkish") return "Hawkish / cuts delayed";
+  if(v === "unknown") return "Unknown";
+  return "Neutral / mixed";
+}
 
   function geoLabel(v){
     if(v === "high") return "High";
@@ -517,6 +529,10 @@
       asOf:$("asOf")?.textContent ?? "As of: —",
       fresh:$("fresh")?.textContent ?? "Sources: —",
       lastSavedISO:new Date().toISOString()
+      fedAutoText:$("fedAutoText")?.textContent ?? "Signal: —",
+      fedAutoAsOf:$("fedAutoAsOf")?.textContent ?? "As of: —",
+      fedAutoSource:$("fedAutoSource")?.textContent ?? "Source: —",
+      fedAutoScore:$("fedAutoScore")?.textContent ?? "Auto",
     };
     localStorage.setItem(storageKey, JSON.stringify(payload));
     if ($("btnSave")){
@@ -553,7 +569,10 @@
           else if (d.usdInrSpotClass.includes("inr-flat")) spot.classList.add("inr-flat");
         }
       }
-
+if($("fedAutoText") && d.fedAutoText != null) $("fedAutoText").textContent = d.fedAutoText;
+if($("fedAutoAsOf") && d.fedAutoAsOf != null) $("fedAutoAsOf").textContent = d.fedAutoAsOf;
+if($("fedAutoSource") && d.fedAutoSource != null) $("fedAutoSource").textContent = d.fedAutoSource;
+if($("fedAutoScore") && d.fedAutoScore != null) $("fedAutoScore").textContent = d.fedAutoScore;
       return true;
     } catch(e){
       return false;
@@ -575,6 +594,10 @@
     if($("asOf")) $("asOf").textContent = "As of: —";
     if($("fresh")) $("fresh").textContent = "Sources: —";
     if($("status")) $("status").textContent = "Status: ready";
+    if($("fedAutoText")) $("fedAutoText").textContent = "Signal: —";
+if($("fedAutoAsOf")) $("fedAutoAsOf").textContent = "As of: —";
+if($("fedAutoSource")) $("fedAutoSource").textContent = "Source: —";
+if($("fedAutoScore")) $("fedAutoScore").textContent = "Auto";
 
     const el = $("usdInrSpot");
     if (el) {
@@ -608,7 +631,34 @@
     if(f?.rsi14Setfgold?.provider) parts.push(`RSI:${f.rsi14Setfgold.provider}`);
     return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
   }
+async function fetchFedOverlay(){
+  try{
+    const res = await fetch("/api/fed", { cache: "no-store" });
+    if(!res.ok) throw new Error(res.status);
+    const data = await res.json();
 
+    if ($("fedTone") && data.fedSignal && data.fedSignal !== "unknown") {
+      $("fedTone").value = data.fedSignal;
+    }
+
+    if ($("fedAutoText")) $("fedAutoText").textContent = `Signal: ${fedSignalLabel(data.fedSignal)}`;
+    if ($("fedAutoAsOf")) $("fedAutoAsOf").textContent = `As of: ${data.fedAsOf || "—"}`;
+    if ($("fedAutoSource")) $("fedAutoSource").textContent = `Source: ${data.fedSource || "—"}`;
+
+    if ($("fedAutoScore")) {
+      let txt = "Auto";
+      if (data.fedConfidence) txt = `Auto: ${data.fedConfidence}`;
+      $("fedAutoScore").textContent = txt;
+    }
+
+    compute();
+  } catch(e){
+    if ($("fedAutoText")) $("fedAutoText").textContent = "Signal: Unknown";
+    if ($("fedAutoAsOf")) $("fedAutoAsOf").textContent = "As of: —";
+    if ($("fedAutoSource")) $("fedAutoSource").textContent = "Source: fetch failed";
+    if ($("fedAutoScore")) $("fedAutoScore").textContent = "Auto: low";
+  }
+}
   async function autoFetch(){
     if ($("status")) $("status").textContent = "Status: fetching…";
     try{
@@ -646,8 +696,9 @@
       if($("fresh")) $("fresh").textContent = formatSources(data.freshness);
 
       if ($("status")) $("status").textContent = "Status: fetched ✓";
-      compute();
-      save();
+await fetchFedOverlay();
+compute();
+save();
     } catch(e) {
       if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
       compute();
@@ -667,8 +718,12 @@
   if ($("btnRefresh")) $("btnRefresh").addEventListener("click", autoFetch);
 
   const hadSaved = load();
-  compute();
-  if(!hadSaved) autoFetch();
+compute();
+if(!hadSaved) {
+  autoFetch();
+} else {
+  fetchFedOverlay();
+}
 </script>
 </body>
 </html>
