@@ -2,186 +2,673 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gold Decision Radar — Market Panel</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Gold Decision Radar v4 India</title>
+  <meta name="description" content="India-focused Gold Decision Radar with auto-fetch for DXY, US 10Y Real Yield, USD/INR trend, and optional SETFGOLD price." />
+  <meta name="theme-color" content="#0b0f14" />
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <style>
-    :root { color-scheme: light; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 18px; }
-    .wrap { max-width: 880px; margin: 0 auto; }
-    h1 { font-size: 20px; margin: 0 0 12px; }
-    .status { font-size: 13px; margin: 8px 0 14px; }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
-    .card { grid-column: span 12; border: 1px solid #ddd; border-radius: 12px; padding: 12px 12px 10px; }
-    @media (min-width: 740px) { .card { grid-column: span 6; } }
-    label { display: block; font-size: 12px; opacity: .8; margin-bottom: 6px; }
-    input, select, button {
-      width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 10px; font-size: 14px;
+    :root{
+      --bg:#0b0f14;--card:#111827;--muted:#94a3b8;--text:#e5e7eb;--line:#1f2937;
+      --good:#22c55e;--mid:#f59e0b;--bad:#ef4444;--radius:16px;--shadow:0 12px 30px rgba(0,0,0,.35);
+      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,"Noto Sans","Liberation Sans",sans-serif;
     }
-    input[readonly] { background: #fafafa; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 10px; }
-    .meta { font-size: 12px; opacity: .7; margin-top: 8px; line-height: 1.35; }
-    .btnrow { display: grid; grid-template-columns: 1fr; gap: 10px; }
-    @media (min-width: 740px) { .btnrow { grid-template-columns: 1fr 1fr 1fr; } }
-    .pill { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; font-size:12px; }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      padding:18px;
+      padding-top:max(18px,env(safe-area-inset-top));
+      padding-bottom:max(18px,env(safe-area-inset-bottom));
+      background:
+        radial-gradient(1000px 500px at 10% -10%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(900px 450px at 110% 10%, rgba(34,197,94,.14), transparent 60%),
+        var(--bg);
+      color:var(--text);
+      font-family:var(--sans);
+      line-height:1.35;
+    }
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+    h1{font-size:20px;margin:0 0 4px 0;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:13px;margin:0}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:16px;
+    }
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
+    @media (max-width:860px){.grid{grid-template-columns:1fr}}
+    .inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:520px){.inputs{grid-template-columns:1fr}}
+    .field{background:rgba(15,23,42,.45);border:1px solid rgba(148,163,184,.18);border-radius:14px;padding:12px}
+    .label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-bottom:8px}
+    .label b{color:var(--text);font-weight:600}
+    input[type="number"],select{
+      width:100%;
+      border-radius:12px;
+      border:1px solid rgba(148,163,184,.24);
+      background:rgba(2,6,23,.55);
+      color:var(--text);
+      padding:12px;
+      font-size:15px;
+      outline:none;
+    }
+    input[type="number"]:focus,select:focus{border-color:rgba(96,165,250,.7);box-shadow:0 0 0 4px rgba(96,165,250,.18)}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px}
+    .panel{display:flex;flex-direction:column;gap:12px}
+    .result{border-radius:18px;padding:16px;border:1px solid rgba(148,163,184,.18);background:rgba(2,6,23,.35)}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
+      font-weight:700;letter-spacing:.4px;text-transform:uppercase;font-size:12px;
+      border:1px solid rgba(148,163,184,.22);
+      background:rgba(15,23,42,.55)
+    }
+    .badge.good{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.12)}
+    .badge.mid{border-color:rgba(245,158,11,.55);background:rgba(245,158,11,.12)}
+    .badge.bad{border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.12)}
+    .big{font-size:22px;margin:10px 0 6px 0;font-weight:800;letter-spacing:.2px}
+    .meta{color:var(--muted);font-size:13px;margin:0}
+    .scoreline{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .chip{background:rgba(15,23,42,.75);border:1px solid rgba(148,163,184,.16);border-radius:999px;padding:8px 10px;font-size:12px;color:var(--text)}
+    .chip code{font-family:var(--mono);font-size:12px;color:#cbd5e1}
+    .actions{display:flex;flex-wrap:wrap;gap:10px}
+    button{
+      border:1px solid rgba(148,163,184,.22);
+      background:rgba(15,23,42,.65);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      font-size:14px;
+      font-weight:650;
+      cursor:pointer;
+    }
+    button.primary{border-color:rgba(96,165,250,.55);background:rgba(96,165,250,.12)}
+    button.danger{border-color:rgba(239,68,68,.55);background:rgba(239,68,68,.10)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.16);background:rgba(2,6,23,.25);font-size:12px}
+    details{border:1px solid rgba(148,163,184,.16);background:rgba(2,6,23,.25);border-radius:14px;padding:12px}
+    summary{cursor:pointer;font-weight:650}
+    footer{margin-top:14px;color:var(--muted);font-size:12px}
+
+    .pill.inr-up  { border-color: rgba(239,68,68,.65) !important; color: rgba(254,202,202,1) !important; }
+    .pill.inr-down{ border-color: rgba(34,197,94,.65) !important; color: rgba(187,247,208,1) !important; }
+    .pill.inr-flat{ border-color: rgba(245,158,11,.65) !important; color: rgba(253,230,138,1) !important; }
+
+    .pill[data-tip]{ position:relative; cursor:help; -webkit-tap-highlight-color:transparent; }
+    .pill[data-tip]::after{
+      content: attr(data-tip);
+      position:absolute;
+      left:0;
+      top:calc(100% + 8px);
+      min-width:240px;
+      max-width:320px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(148,163,184,.22);
+      background:rgba(2,6,23,.95);
+      color:var(--text);
+      font-size:12px;
+      line-height:1.35;
+      box-shadow:0 12px 30px rgba(0,0,0,.35);
+      opacity:0;
+      transform:translateY(-4px);
+      pointer-events:none;
+      z-index:50;
+    }
+    .pill[data-tip]:hover::after,
+    .pill[data-tip]:focus::after{
+      opacity:1;
+      transform:translateY(0);
+    }
+
+    .zone-buy { background:#0f9d58; border:2px solid #0b6f3f; color:#fff; }
+    .zone-hold{ background:#f4b400; border:2px solid #c69500; color:#fff; }
+    .zone-trim{ background:#db4437; border:2px solid #a52714; color:#fff; }
+    .zone-wait{ background:#424242; border:2px solid #1f1f1f; color:#fff; }
+
+    .zone-buy *, .zone-hold *, .zone-trim *, .zone-wait * { color:#fff !important; }
+    .zone-buy .chip, .zone-hold .chip, .zone-trim .chip, .zone-wait .chip{
+      background:rgba(255,255,255,0.15);
+      border:1px solid rgba(255,255,255,0.30);
+    }
+    .zone-buy .badge, .zone-hold .badge, .zone-trim .badge, .zone-wait .badge{
+      background:rgba(0,0,0,0.25);
+      color:#fff;
+    }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <h1>Gold Decision Radar — Market (Auto)</h1>
-    <div class="status" id="status">Status: idle</div>
-
-    <div class="btnrow">
-      <button id="btnFetch" type="button">Fetch now</button>
-      <button id="btnStart" type="button">Start auto (60s)</button>
-      <button id="btnStop" type="button">Stop auto</button>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Gold Decision Radar v4 India</h1>
+      <p class="sub"><b>India model:</b> USD/INR + Real Yield + Domestic Gold Price + DXY + Geo Risk, with RSI as timing overlay.</p>
     </div>
-
-    <div class="meta">
-      API: <span class="pill">/api/market</span> (front-end reads: <span class="pill">SETFGOLD price</span>, <span class="pill">RSI</span>, <span class="pill">USD/INR</span>, <span class="pill">DXY</span>, <span class="pill">Real Yield</span>)
+    <div class="actions">
+      <button class="primary" id="btnRefresh">Auto-Fetch Now</button>
+      <button class="primary" id="btnSave">Save</button>
+      <button id="btnShare">Share</button>
+      <button class="danger" id="btnReset">Reset</button>
     </div>
+  </header>
 
-    <div class="grid" style="margin-top:14px;">
-      <div class="card">
-        <label for="setfGoldPrice">SETFGOLD Market Price (₹)</label>
-        <input id="setfGoldPrice" readonly placeholder="—" />
-        <div class="meta">From: <span class="pill">setfGoldPrice</span></div>
+  <div class="grid">
+    <section class="card">
+
+      <div class="row" style="margin-bottom:12px;">
+        <span class="pill" id="status">Status: ready</span>
+        <span class="pill" id="asOf">As of: —</span>
+        <span class="pill" id="fresh">Sources: —</span>
       </div>
 
-      <div class="card">
-        <label for="rsi14">RSI(14) — SETFGOLD</label>
-        <input id="rsi14" readonly placeholder="—" />
-        <div class="meta">From: <span class="pill">rsi14Setfgold</span></div>
-      </div>
-
-      <div class="card">
-        <label for="usdInr">USD/INR Spot</label>
-        <input id="usdInr" readonly placeholder="—" />
-        <div class="meta">
-          From: <span class="pill">usdInr</span>
-          &nbsp;| 30d%: <span id="usdInr30d" class="pill">—</span>
-          &nbsp;| Trend: <span id="usdInrTrend" class="pill">—</span>
+      <div class="field" style="grid-column: 1 / -1; margin-bottom:12px;">
+        <div class="label"><b>USD/INR Spot</b></div>
+        <span class="pill" id="usdInrSpot"
+          tabindex="0"
+          data-tip="Legend: Red = USD/INR ↑ (INR weakening), Green = USD/INR ↓ (INR strengthening), Yellow = flat/range-bound (±0.2%).">
+          USD/INR Spot: —
+        </span>
+        <div class="hint">
+          Color code retained. Trend is still used in decision logic.
         </div>
       </div>
 
-      <div class="card">
-        <label for="dxy">DXY</label>
-        <input id="dxy" readonly placeholder="—" />
-        <div class="meta">From: <span class="pill">dxy</span></div>
+      <div class="field" style="grid-column: 1 / -1;">
+        <div class="label"><b>RSI (14) – SETFGOLD</b><span id="rsiScore" class="pill">Timing: —</span></div>
+        <input type="number" id="rsi14" step="0.1" inputmode="decimal" placeholder="Auto-fetched if available, else enter manually" />
+        <div class="hint">Timing only: &lt;35 = good entry • 35–65 = neutral • 65–75 = stretched • &gt;75 = overbought wait</div>
       </div>
 
-      <div class="card">
-        <label for="realYield">US 10Y Real Yield</label>
-        <input id="realYield" readonly placeholder="—" />
-        <div class="meta">From: <span class="pill">realYield</span> (FRED DFII10)</div>
+      <div class="field" style="grid-column: 1 / -1;">
+        <div class="label"><b>Domestic Gold Price / SETFGOLD Market Price (₹)</b><span id="pxScore" class="pill">Weight: 20%</span></div>
+        <input type="number" id="setfPrice" step="0.01" inputmode="decimal" placeholder="Auto-fetched if available, or enter manually" />
+        <div class="hint">Core factor. Higher domestic price strength supports gold trend.</div>
       </div>
 
-      <div class="card">
-        <label for="asOf">As of (API)</label>
-        <input id="asOf" readonly placeholder="—" />
-        <div class="meta">
-          Errors: <span id="errCount" class="pill">0</span>
-          <div id="errList" class="meta" style="margin-top:8px;"></div>
+      <div class="field" style="grid-column: 1 / -1;">
+        <div class="label"><b>SBI Gold ETF iNAV (₹)</b><span id="inavScore" class="pill">Overlay</span></div>
+        <input type="number" id="sbiInav" step="0.0001" inputmode="decimal" placeholder="Enter latest SBI iNAV manually" />
+        <div class="hint" id="sbiInavRule">Overlay only: used to show premium / discount vs market price. Not part of core India score.</div>
+        <div class="hint" id="sbiInavAsOf">As of: —</div>
+      </div>
+
+      <div class="inputs">
+        <div class="field">
+          <div class="label"><b>DXY</b><span id="dxyScore" class="pill">Weight: 10%</span></div>
+          <input type="number" id="dxy" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
+          <div class="hint">Lower DXY is supportive for gold.</div>
+        </div>
+
+        <div class="field">
+          <div class="label"><b>US 10Y Real Yield (%)</b><span id="ryScore" class="pill">Weight: 25%</span></div>
+          <input type="number" id="realYield" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
+          <div class="hint">Lower real yield is bullish for gold.</div>
+        </div>
+
+        <div class="field">
+          <div class="label"><b>Fed Tone (optional overlay)</b><span id="fedScore" class="pill">Overlay</span></div>
+          <select id="fedTone">
+            <option value="cuts_likely">Rate cuts likely / dovish</option>
+            <option value="neutral" selected>Neutral / mixed</option>
+            <option value="hawkish">Cuts delayed / hawkish</option>
+          </select>
+          <div class="hint">Shown as context only. Not included in core India weighted score.</div>
+        </div>
+
+        <div class="field">
+          <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Weight: 10%</span></div>
+          <select id="geoRisk">
+            <option value="high">War / crisis escalating</option>
+            <option value="medium" selected>Normal / elevated</option>
+            <option value="low">Risk fading / calming</option>
+          </select>
+          <div class="hint">High risk supports gold.</div>
+        </div>
+
+        <div class="field" style="grid-column: 1 / -1;">
+          <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Weight: 35%</span></div>
+          <select id="inrTrend">
+            <option value="weakening">INR weakening (USD/INR rising)</option>
+            <option value="stable" selected>Stable / range-bound</option>
+            <option value="strengthening">INR strengthening (USD/INR falling)</option>
+          </select>
+          <div class="hint">Higher USD/INR is supportive for India gold pricing.</div>
         </div>
       </div>
-    </div>
+
+      <details style="margin-top:12px;">
+        <summary>Decision logic</summary>
+        <div class="hint" style="margin-top:8px;">
+          Core India score = USD/INR 35% + Real Yield 25% + Domestic Gold Price 20% + DXY 10% + Geo Risk 10%<br>
+          RSI is a timing layer only.<br><br>
+          Score ≥ 80 = BUY / ACCUMULATE<br>
+          50–79 = HOLD / SIP<br>
+          35–49 = WAIT<br>
+          &lt;35 = TRIM / AVOID
+        </div>
+      </details>
+
+      <details style="margin-top:12px;">
+        <summary>Install on iPhone</summary>
+        <div class="hint" style="margin-top:8px;">
+          iOS requires a hosted URL once. After that it’s a Home Screen app:
+          <ol>
+            <li>Deploy this project on Cloudflare Pages.</li>
+            <li>Open the URL in <b>Safari</b> on your iPhone.</li>
+            <li>Share → <b>Add to Home Screen</b>.</li>
+          </ol>
+        </div>
+      </details>
+    </section>
+
+    <aside class="card panel">
+      <div class="result" aria-live="polite">
+        <span class="badge mid" id="badge">WAIT</span>
+        <div class="big" id="headline">Fill inputs → WAIT</div>
+        <p class="meta" id="explain">Auto-fetch fills DXY / Real Yield / USDINR trend. Domestic gold price can be auto or manual.</p>
+        <div class="scoreline" id="chips"></div>
+      </div>
+
+      <details>
+        <summary>Timing overlay</summary>
+        <div class="hint" style="margin-top:8px;">
+          RSI is not a price driver here. It only helps with entry timing after the core score is calculated.
+        </div>
+      </details>
+    </aside>
   </div>
 
-  <script>
-    // Tiny helper
-    const $ = (id) => document.getElementById(id);
+  <footer>Offline: app shell cached. If network is down, it uses last saved values.</footer>
+</div>
 
-    // --- AutoFetch: ONLY these 5 values ---
-    // Reads: setfGoldPrice, rsi14Setfgold, usdInr, dxy, realYield
-    async function autoFetch({ inavOff = true } = {}) {
-      const statusEl = $("status");
+<script>
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 
-      const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
+  const $ = (id) => document.getElementById(id);
+  const storageKey = "goldDecisionRadar:v4india";
+  const toNum = (v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  };
 
-      const setField = (id, value) => {
-        const el = $(id);
-        if (!el) return;
-        if ("value" in el) el.value = value;
-        else el.textContent = value;
-      };
+  function applyDecisionZone(zone){
+    const panel = document.querySelector(".card.panel");
+    if (!panel) return;
+    panel.classList.remove("zone-buy","zone-hold","zone-trim","zone-wait");
+    panel.classList.add(zone);
+  }
 
-      const fmt = { num: (v, digits) => (Number.isFinite(v) ? v.toFixed(digits) : "—") };
+  function fedToneLabel(v){
+    if(v === "cuts_likely") return "Dovish";
+    if(v === "hawkish") return "Hawkish";
+    return "Neutral";
+  }
 
-      setStatus("Status: fetching…");
+  function geoLabel(v){
+    if(v === "high") return "High";
+    if(v === "low") return "Low";
+    return "Medium";
+  }
 
-      try {
-        const endpoint = inavOff ? "/api/market?inav=off" : "/api/market";
-        const res = await fetch(endpoint, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  function inrLabel(v){
+    if(v === "weakening") return "INR weakening";
+    if(v === "strengthening") return "INR strengthening";
+    return "Stable";
+  }
 
-        const data = await res.json();
+  function rsiTiming(rsi){
+    if(!Number.isFinite(rsi)) return { text: "Manual input needed", tone: "—" };
+    if(rsi < 35) return { text: "Good entry zone", tone: "Good" };
+    if(rsi <= 65) return { text: "Neutral timing", tone: "Neutral" };
+    if(rsi <= 75) return { text: "Price stretched", tone: "Caution" };
+    return { text: "Overbought wait", tone: "Avoid chasing" };
+  }
 
-        // Parse & guard
-        const setfGoldPrice = Number(data?.setfGoldPrice);
-        const rsi14 = Number(data?.rsi14Setfgold);
-        const usdInr = Number(data?.usdInr);
-        const dxy = Number(data?.dxy);
-        const realYield = Number(data?.realYield);
+  function scoreUsdInrTrend(trend){
+    if(trend === "weakening") return 35;
+    if(trend === "stable") return 20;
+    if(trend === "strengthening") return 8;
+    return null;
+  }
 
-        // Write ONLY these 5 to main inputs
-        setField("setfGoldPrice", fmt.num(setfGoldPrice, 2));
-        setField("rsi14", fmt.num(rsi14, 1));
-        setField("usdInr", fmt.num(usdInr, 4));
-        setField("dxy", fmt.num(dxy, 2));
-        setField("realYield", fmt.num(realYield, 2));
+  function scoreRealYield(val){
+    if(!Number.isFinite(val)) return null;
+    if(val <= 1.20) return 25;
+    if(val <= 1.60) return 18;
+    if(val <= 2.00) return 12;
+    return 5;
+  }
 
-        // Optional supporting display (still aligned with market.js response)
-        setField("usdInr30d", Number.isFinite(Number(data?.usdInrChangePct30d)) ? `${Number(data.usdInrChangePct30d).toFixed(2)}%` : "—");
-        setField("usdInrTrend", data?.usdInrTrend ? String(data.usdInrTrend) : "—");
+  function scoreDomesticGold(val){
+    if(!Number.isFinite(val)) return null;
+    if(val >= 140) return 20;
+    if(val >= 130) return 15;
+    if(val >= 120) return 10;
+    return 5;
+  }
 
-        setField("asOf", data?.asOf ? String(data.asOf) : "—");
+  function scoreDxy(val){
+    if(!Number.isFinite(val)) return null;
+    if(val <= 98) return 10;
+    if(val <= 102) return 6;
+    return 3;
+  }
 
-        const errors = Array.isArray(data?.errors) ? data.errors : [];
-        setField("errCount", String(errors.length));
+  function scoreGeo(v){
+    if(v === "high") return 10;
+    if(v === "medium") return 6;
+    if(v === "low") return 3;
+    return null;
+  }
 
-        const errListEl = $("errList");
-        if (errListEl) {
-          errListEl.innerHTML = errors.length
-            ? "<b>Warnings:</b><ul style='margin:6px 0 0 18px; padding:0;'>" +
-              errors.map(e => `<li>${escapeHtml(String(e))}</li>`).join("") +
-              "</ul>"
-            : "";
+  function premiumDiscountText(price, inav){
+    if(!Number.isFinite(price) || !Number.isFinite(inav) || inav === 0) return "—";
+    const pct = ((price - inav) / inav) * 100;
+    return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${pct > 0 ? "premium" : "discount"}`;
+  }
+
+  function compute(){
+    const dxy = toNum($("dxy")?.value ?? "");
+    const realYield = toNum($("realYield")?.value ?? "");
+    const setfPrice = toNum($("setfPrice")?.value ?? "");
+    const sbiInav = toNum($("sbiInav")?.value ?? "");
+    const rsi = toNum($("rsi14")?.value ?? "");
+    const fedTone = $("fedTone")?.value ?? "neutral";
+    const geoRisk = $("geoRisk")?.value ?? "medium";
+    const inrTrend = $("inrTrend")?.value ?? "stable";
+
+    const sInr = scoreUsdInrTrend(inrTrend);
+    const sRy = scoreRealYield(realYield);
+    const sGold = scoreDomesticGold(setfPrice);
+    const sDxy = scoreDxy(dxy);
+    const sGeo = scoreGeo(geoRisk);
+
+    if ($("inrScore")) $("inrScore").textContent = `Score: ${sInr ?? "—"}/35`;
+    if ($("ryScore")) $("ryScore").textContent = `Score: ${sRy ?? "—"}/25`;
+    if ($("pxScore")) $("pxScore").textContent = `Score: ${sGold ?? "—"}/20`;
+    if ($("dxyScore")) $("dxyScore").textContent = `Score: ${sDxy ?? "—"}/10`;
+    if ($("geoScore")) $("geoScore").textContent = `Score: ${sGeo ?? "—"}/10`;
+
+    const timing = rsiTiming(rsi);
+    if ($("rsiScore")) $("rsiScore").textContent = `Timing: ${timing.tone}`;
+    if ($("fedScore")) $("fedScore").textContent = `Overlay: ${fedToneLabel(fedTone)}`;
+    if ($("inavScore")) $("inavScore").textContent = `Overlay: ${premiumDiscountText(setfPrice, sbiInav)}`;
+
+    const missing = [];
+    if (sInr === null) missing.push("USD/INR trend");
+    if (sRy === null) missing.push("Real Yield");
+    if (sGold === null) missing.push("Domestic Gold Price");
+    if (sDxy === null) missing.push("DXY");
+    if (sGeo === null) missing.push("Geo Risk");
+
+    if (missing.length){
+      if ($("badge")) { $("badge").textContent = "WAIT"; $("badge").className = "badge mid"; }
+      if ($("headline")) $("headline").textContent = "Insufficient core inputs → WAIT";
+      if ($("explain")) $("explain").textContent = `Fill: ${missing.join(", ")}`;
+      applyDecisionZone("zone-wait");
+
+      const box = $("chips");
+      if (box){
+        box.innerHTML = "";
+        const chips = [
+          ["USD/INR", inrLabel(inrTrend), sInr ?? "—"],
+          ["Real Yield", Number.isFinite(realYield) ? realYield.toFixed(2) : "—", sRy ?? "—"],
+          ["Domestic Gold", Number.isFinite(setfPrice) ? setfPrice.toFixed(2) : "—", sGold ?? "—"],
+          ["DXY", Number.isFinite(dxy) ? dxy.toFixed(2) : "—", sDxy ?? "—"],
+          ["Geo Risk", geoLabel(geoRisk), sGeo ?? "—"],
+          ["RSI Timing", timing.text, "overlay"],
+          ["Fed", fedToneLabel(fedTone), "overlay"],
+          ["Px vs iNAV", premiumDiscountText(setfPrice, sbiInav), "overlay"]
+        ];
+        chips.forEach(([n,v,s])=>{
+          const el=document.createElement("div");
+          el.className="chip";
+          el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
+          box.appendChild(el);
+        });
+      }
+      return { total: null, label: "WAIT" };
+    }
+
+    const total = sInr + sRy + sGold + sDxy + sGeo;
+
+    let action = "HOLD";
+    let label = "HOLD / SIP";
+    let cls = "mid";
+    let exp = "Mixed core signals.";
+    let zone = "zone-hold";
+
+    if (total >= 80) {
+      action = "BUY";
+      label = "BUY / ACCUMULATE";
+      cls = "good";
+      exp = `Strong core setup. Timing: ${timing.text}.`;
+      zone = "zone-buy";
+    } else if (total >= 50) {
+      action = "HOLD";
+      label = "HOLD / SIP";
+      cls = "mid";
+      exp = `Core trend is supportive but not decisive. Timing: ${timing.text}.`;
+      zone = "zone-hold";
+    } else if (total >= 35) {
+      action = "WAIT";
+      label = "WAIT";
+      cls = "mid";
+      exp = `Weak edge. Better to wait for better setup. Timing: ${timing.text}.`;
+      zone = "zone-wait";
+    } else {
+      action = "TRIM";
+      label = "TRIM / AVOID";
+      cls = "bad";
+      exp = `Weak core setup. Avoid aggressive fresh buying. Timing: ${timing.text}.`;
+      zone = "zone-trim";
+    }
+
+    if ($("badge")) { $("badge").textContent = action; $("badge").className = `badge ${cls}`; }
+    if ($("headline")) $("headline").textContent = `Core Score: ${total}/100 → ${label}`;
+    if ($("explain")) $("explain").textContent = exp;
+    applyDecisionZone(zone);
+
+    const box = $("chips");
+    if (box){
+      box.innerHTML = "";
+      const chips = [
+        ["USD/INR", inrLabel(inrTrend), `${sInr}/35`],
+        ["Real Yield", realYield.toFixed(2), `${sRy}/25`],
+        ["Domestic Gold", setfPrice.toFixed(2), `${sGold}/20`],
+        ["DXY", dxy.toFixed(2), `${sDxy}/10`],
+        ["Geo Risk", geoLabel(geoRisk), `${sGeo}/10`],
+        ["RSI Timing", timing.text, "overlay"],
+        ["Fed", fedToneLabel(fedTone), "overlay"],
+        ["Px vs iNAV", premiumDiscountText(setfPrice, sbiInav), "overlay"]
+      ];
+      chips.forEach(([n,v,s])=>{
+        const el=document.createElement("div");
+        el.className="chip";
+        el.innerHTML=`${n}: <code>${v}</code> • <b>${s}</b>`;
+        box.appendChild(el);
+      });
+    }
+
+    return { total, label };
+  }
+
+  function save(){
+    const payload = {
+      dxy:$("dxy")?.value ?? "",
+      realYield:$("realYield")?.value ?? "",
+      fedTone:$("fedTone")?.value ?? "neutral",
+      geoRisk:$("geoRisk")?.value ?? "medium",
+      inrTrend:$("inrTrend")?.value ?? "stable",
+      rsi14:$("rsi14")?.value ?? "",
+      setfPrice:$("setfPrice")?.value ?? "",
+      sbiInav:$("sbiInav")?.value ?? "",
+      sbiInavAsOf:$("sbiInavAsOf")?.textContent ?? "As of: —",
+      usdInrSpot:$("usdInrSpot")?.textContent ?? "USD/INR Spot: —",
+      usdInrSpotClass:Array.from($("usdInrSpot")?.classList ?? []).join(" "),
+      asOf:$("asOf")?.textContent ?? "As of: —",
+      fresh:$("fresh")?.textContent ?? "Sources: —",
+      lastSavedISO:new Date().toISOString()
+    };
+    localStorage.setItem(storageKey, JSON.stringify(payload));
+    if ($("btnSave")){
+      $("btnSave").textContent = "Saved ✓";
+      setTimeout(()=> $("btnSave").textContent = "Save", 900);
+    }
+  }
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(storageKey);
+      if(!raw) return false;
+      const d = JSON.parse(raw);
+
+      if($("dxy") && d.dxy != null) $("dxy").value = d.dxy;
+      if($("realYield") && d.realYield != null) $("realYield").value = d.realYield;
+      if($("fedTone") && d.fedTone) $("fedTone").value = d.fedTone;
+      if($("geoRisk") && d.geoRisk) $("geoRisk").value = d.geoRisk;
+      if($("inrTrend") && d.inrTrend) $("inrTrend").value = d.inrTrend;
+      if($("rsi14") && d.rsi14 != null) $("rsi14").value = d.rsi14;
+      if($("setfPrice") && d.setfPrice != null) $("setfPrice").value = d.setfPrice;
+      if($("sbiInav") && d.sbiInav != null) $("sbiInav").value = d.sbiInav;
+      if($("sbiInavAsOf") && d.sbiInavAsOf != null) $("sbiInavAsOf").textContent = d.sbiInavAsOf;
+      if($("asOf") && d.asOf) $("asOf").textContent = d.asOf;
+      if($("fresh") && d.fresh) $("fresh").textContent = d.fresh;
+
+      const spot = $("usdInrSpot");
+      if (spot && d.usdInrSpot) {
+        spot.textContent = d.usdInrSpot;
+        spot.classList.remove("inr-up","inr-down","inr-flat");
+        if (typeof d.usdInrSpotClass === "string") {
+          if (d.usdInrSpotClass.includes("inr-up")) spot.classList.add("inr-up");
+          else if (d.usdInrSpotClass.includes("inr-down")) spot.classList.add("inr-down");
+          else if (d.usdInrSpotClass.includes("inr-flat")) spot.classList.add("inr-flat");
+        }
+      }
+
+      return true;
+    } catch(e){
+      return false;
+    }
+  }
+
+  function resetAll(){
+    localStorage.removeItem(storageKey);
+
+    if($("dxy")) $("dxy").value = "";
+    if($("realYield")) $("realYield").value = "";
+    if($("fedTone")) $("fedTone").value = "neutral";
+    if($("geoRisk")) $("geoRisk").value = "medium";
+    if($("inrTrend")) $("inrTrend").value = "stable";
+    if($("rsi14")) $("rsi14").value = "";
+    if($("setfPrice")) $("setfPrice").value = "";
+    if($("sbiInav")) $("sbiInav").value = "";
+    if($("sbiInavAsOf")) $("sbiInavAsOf").textContent = "As of: —";
+    if($("asOf")) $("asOf").textContent = "As of: —";
+    if($("fresh")) $("fresh").textContent = "Sources: —";
+    if($("status")) $("status").textContent = "Status: ready";
+
+    const el = $("usdInrSpot");
+    if (el) {
+      el.textContent = "USD/INR Spot: —";
+      el.classList.remove("inr-up","inr-down","inr-flat");
+    }
+
+    applyDecisionZone("zone-wait");
+    compute();
+  }
+
+  async function share(){
+    const r = compute();
+    const text = `Gold Radar v4 India\n${r.total === null ? "WAIT (missing core inputs)" : ("Core Score: " + r.total + "/100 → " + r.label)}`;
+    try{
+      if(navigator.share) await navigator.share({ title:"Gold Radar", text });
+      else {
+        await navigator.clipboard.writeText(text);
+        alert("Copied.");
+      }
+    } catch(e){}
+  }
+
+  function formatSources(f){
+    const parts = [];
+    if(f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
+    if(f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
+    if(f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
+    if(f?.setfGoldPrice?.provider) parts.push(`SETFGOLD:${f.setfGoldPrice.provider}`);
+    if(f?.sbiGoldEtfInav?.provider) parts.push(`SBI iNAV:${f.sbiGoldEtfInav.provider}`);
+    if(f?.rsi14Setfgold?.provider) parts.push(`RSI:${f.rsi14Setfgold.provider}`);
+    return parts.length ? ("Sources: " + parts.join(" | ")) : "Sources: —";
+  }
+
+  async function autoFetch(){
+    if ($("status")) $("status").textContent = "Status: fetching…";
+    try{
+      const res = await fetch("/api/market", { cache: "no-store" });
+      if(!res.ok) throw new Error(res.status);
+      const data = await res.json();
+
+      if ($("dxy") && Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
+      if ($("realYield") && Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
+      if ($("setfPrice") && Number.isFinite(data.setfGoldPrice)) $("setfPrice").value = data.setfGoldPrice.toFixed(2);
+      if ($("rsi14") && Number.isFinite(data.rsi14Setfgold)) $("rsi14").value = data.rsi14Setfgold.toFixed(1);
+      if ($("sbiInav") && Number.isFinite(data.sbiGoldEtfInav)) $("sbiInav").value = Number(data.sbiGoldEtfInav).toFixed(4);
+      if ($("sbiInavAsOf") && data.sbiGoldEtfInavAsOf) $("sbiInavAsOf").textContent = `As of: ${data.sbiGoldEtfInavAsOf}`;
+      if (data.usdInrTrend && $("inrTrend")) $("inrTrend").value = data.usdInrTrend;
+
+      if (Number.isFinite(data.usdInr)) {
+        const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
+        let arrow = "→";
+        let cls = "inr-flat";
+        if (pct !== null) {
+          if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
+          else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
         }
 
-        setStatus(errors.length ? `Status: fetched (with ${errors.length} warning${errors.length > 1 ? "s" : ""})` : "Status: fetched ✅");
-      } catch (e) {
-        console.error("autoFetch error:", e);
-        setStatus(`Status: fetch failed ❌ (${String(e?.message || e)})`);
+        const pctText = (pct === null) ? "" : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
+        const el = $("usdInrSpot");
+        if (el) {
+          el.textContent = `USD/INR Spot: ${data.usdInr.toFixed(2)}${pctText}`;
+          el.classList.remove("inr-up","inr-down","inr-flat");
+          el.classList.add(cls);
+        }
       }
+
+      if($("asOf")) $("asOf").textContent = `As of: ${data.asOf || "—"}`;
+      if($("fresh")) $("fresh").textContent = formatSources(data.freshness);
+
+      if ($("status")) $("status").textContent = "Status: fetched ✓";
+      compute();
+      save();
+    } catch(e) {
+      if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
+      compute();
     }
+  }
 
-    function escapeHtml(s) {
-      return s.replace(/[&<>"']/g, (c) => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-      }[c]));
-    }
+  ["dxy","realYield","fedTone","geoRisk","inrTrend","rsi14","setfPrice","sbiInav"].forEach(id=>{
+    const el = $(id);
+    if(!el) return;
+    el.addEventListener("input", compute);
+    el.addEventListener("change", compute);
+  });
 
-    // Optional polling wrapper
-    let _autoFetchTimer = null;
+  if ($("btnSave")) $("btnSave").addEventListener("click", save);
+  if ($("btnReset")) $("btnReset").addEventListener("click", ()=>{ if(confirm("Reset all values?")) resetAll(); });
+  if ($("btnShare")) $("btnShare").addEventListener("click", share);
+  if ($("btnRefresh")) $("btnRefresh").addEventListener("click", autoFetch);
 
-    function startAutoFetch(intervalMs = 60000, opts = { inavOff: true }) {
-      stopAutoFetch();
-      autoFetch(opts); // immediate
-      _autoFetchTimer = setInterval(() => autoFetch(opts), intervalMs);
-    }
-
-    function stopAutoFetch() {
-      if (_autoFetchTimer) clearInterval(_autoFetchTimer);
-      _autoFetchTimer = null;
-    }
-
-    // Wire buttons
-    $("btnFetch").addEventListener("click", () => autoFetch({ inavOff: true }));
-    $("btnStart").addEventListener("click", () => startAutoFetch(60000, { inavOff: true }));
-    $("btnStop").addEventListener("click", () => stopAutoFetch());
-
-    // Optional: auto start once on load
-    autoFetch({ inavOff: true });
-  </script>
+  const hadSaved = load();
+  compute();
+  if(!hadSaved) autoFetch();
+</script>
 </body>
 </html>
