@@ -514,28 +514,36 @@
   }
 
   function save(){
-    const payload = {
-  dxy:$("dxy")?.value ?? "",
-  realYield:$("realYield")?.value ?? "",
-  fedTone:$("fedTone")?.value ?? "neutral",
-  geoRisk:$("geoRisk")?.value ?? "medium",
-  inrTrend:$("inrTrend")?.value ?? "stable",
-  rsi14:$("rsi14")?.value ?? "",
-  setfPrice:$("setfPrice")?.value ?? "",
-  sbiInav:$("sbiInav")?.value ?? "",
-  sbiInavAsOf:$("sbiInavAsOf")?.textContent ?? "As of: —",
-  usdInrSpot:$("usdInrSpot")?.textContent ?? "USD/INR Spot: —",
-  usdInrSpotClass:Array.from($("usdInrSpot")?.classList ?? []).join(" "),
-  asOf:$("asOf")?.textContent ?? "As of: —",
-  fresh:$("fresh")?.textContent ?? "Sources: —",
+  const payload = {
+    dxy:$("dxy")?.value ?? "",
+    realYield:$("realYield")?.value ?? "",
+    fedTone:$("fedTone")?.value ?? "neutral",
+    geoRisk:$("geoRisk")?.value ?? "medium",
+    inrTrend:$("inrTrend")?.value ?? "stable",
+    rsi14:$("rsi14")?.value ?? "",
+    setfPrice:$("setfPrice")?.value ?? "",
+    sbiInav:$("sbiInav")?.value ?? "",
+    sbiInavAsOf:$("sbiInavAsOf")?.textContent ?? "As of: —",
+    usdInrSpot:$("usdInrSpot")?.textContent ?? "USD/INR Spot: —",
+    usdInrSpotClass:Array.from($("usdInrSpot")?.classList ?? []).join(" "),
+    asOf:$("asOf")?.textContent ?? "As of: —",
+    fresh:$("fresh")?.textContent ?? "Sources: —",
+    fedAutoText:$("fedAutoText")?.textContent ?? "Signal: —",
+    fedAutoAsOf:$("fedAutoAsOf")?.textContent ?? "As of: —",
+    fedAutoSource:$("fedAutoSource")?.textContent ?? "Source: —",
+    fedAutoScore:$("fedAutoScore")?.textContent ?? "Auto",
+    lastSavedISO:new Date().toISOString()
+  };
 
-  fedAutoText:$("fedAutoText")?.textContent ?? "Signal: —",
-  fedAutoAsOf:$("fedAutoAsOf")?.textContent ?? "As of: —",
-  fedAutoSource:$("fedAutoSource")?.textContent ?? "Source: —",
-  fedAutoScore:$("fedAutoScore")?.textContent ?? "Auto",
+  localStorage.setItem(storageKey, JSON.stringify(payload));
 
-  lastSavedISO:new Date().toISOString()
-};
+  if ($("btnSave")){
+    $("btnSave").textContent = "Saved ✓";
+    setTimeout(() => {
+      $("btnSave").textContent = "Save";
+    }, 900);
+  }
+}
 
   function load(){
     try{
@@ -590,7 +598,6 @@
     if($("asOf")) $("asOf").textContent = "As of: —";
     if($("fresh")) $("fresh").textContent = "Sources: —";
     if($("status")) $("status").textContent = "Status: ready";
-    if($("fedAutoText")) $("fedAutoText").textContent = "Signal: —";
     if($("fedAutoText")) $("fedAutoText").textContent = "Signal: —";
     if($("fedAutoAsOf")) $("fedAutoAsOf").textContent = "As of: —";
     if($("fedAutoSource")) $("fedAutoSource").textContent = "Source: —";
