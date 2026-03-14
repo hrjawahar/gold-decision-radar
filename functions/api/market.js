@@ -124,12 +124,20 @@ async function getRealYieldSafe() {
       value,
       source: { provider: "fred", series: "DFII10" }
     };
-  } catch (e) {
-    return {
-      value: null,
-      source: { provider: "fred", series: "DFII10", note: "real_yield_fetch_failed" },
-      error: "real_yield_fetch_failed"
-    };
+  } catch (e1) {
+    try {
+      const value = await fetchFredLastValueAlt("DFII10");
+      return {
+        value,
+        source: { provider: "fred_alt", series: "DFII10" }
+      };
+    } catch (e2) {
+      return {
+        value: null,
+        source: { provider: "fred", series: "DFII10", note: "real_yield_fetch_failed" },
+        error: "real_yield_fetch_failed"
+      };
+    }
   }
 }
 
@@ -419,17 +427,42 @@ async function fetchStooqClose(symbol, computePct = false) {
 
 async function fetchFredLastValue(seriesId) {
   const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`;
-  const res = await fetch(url, { headers: { "accept": "text/csv" } });
+  const res = await fetch(url, {
+    headers: {
+      "accept": "text/csv,*/*",
+      "user-agent": "Mozilla/5.0"
+    }
+  });
 
   if (!res.ok) throw new Error(`FRED fetch failed for ${seriesId}: HTTP ${res.status}`);
 
   const text = await res.text();
+  return parseFredCsvLastValue(text, seriesId);
+}
+
+async function fetchFredLastValueAlt(seriesId) {
+  const url = `https://fred.stlouisfed.org/series/${encodeURIComponent(seriesId)}/downloaddata/${encodeURIComponent(seriesId)}.csv`;
+  const res = await fetch(url, {
+    headers: {
+      "accept": "text/csv,*/*",
+      "user-agent": "Mozilla/5.0"
+    }
+  });
+
+  if (!res.ok) throw new Error(`FRED alt fetch failed for ${seriesId}: HTTP ${res.status}`);
+
+  const text = await res.text();
+  return parseFredCsvLastValue(text, seriesId);
+}
+
+function parseFredCsvLastValue(text, seriesId) {
   const lines = text.trim().split(/\r?\n/);
 
   for (let i = lines.length - 1; i >= 1; i--) {
     const parts = lines[i].split(",");
     if (parts.length >= 2) {
-      const v = parseFloat(parts[1]);
+      const raw = String(parts[1]).replace(/"/g, "").trim();
+      const v = parseFloat(raw);
       if (Number.isFinite(v)) return v;
     }
   }
