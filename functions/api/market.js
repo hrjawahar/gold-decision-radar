@@ -30,7 +30,7 @@ export async function onRequestGet() {
       sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
 
       asOf: new Date().toISOString(),
-      contractVersion: 4,
+      contractVersion: 5,
 
       quality: {
         dxy: numberOrNull(dxyObj?.value) !== null ? "ok" : "missing",
@@ -118,19 +118,98 @@ async function getUsdInrSafe() {
 }
 
 async function getRealYieldSafe() {
-  try {
-    const value = await fetchFredLastValue("DFII10");
-    return {
-      value,
-      source: { provider: "fred", series: "DFII10" }
-    };
-  } catch (e) {
-    return {
-      value: null,
-      source: { provider: "fred", series: "DFII10", note: "real_yield_fetch_failed" },
-      error: "real_yield_fetch_failed"
-    };
+  const seriesId = "DFII10";
+
+  const urls = [
+    `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`,
+    `https://fred.stlouisfed.org/series/${encodeURIComponent(seriesId)}/downloaddata/${encodeURIComponent(seriesId)}.csv`
+  ];
+
+  const headers = {
+    "accept": "text/csv,text/plain,*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "referer": "https://fred.stlouisfed.org/",
+    "user-agent": "Mozilla/5.0"
+  };
+
+  const errors = [];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers,
+        redirect: "follow",
+        cf: { cacheTtl: 300, cacheEverything: false }
+      });
+
+      if (!res.ok) {
+        errors.push(`${url} -> HTTP ${res.status}`);
+        continue;
+      }
+
+      const text = await res.text();
+      const value = parseFredCsvLatestValue(text, seriesId);
+
+      if (Number.isFinite(value)) {
+        return {
+          value,
+          source: {
+            provider: "fred",
+            series: seriesId,
+            url
+          }
+        };
+      }
+
+      errors.push(`${url} -> parse_failed`);
+    } catch (e) {
+      errors.push(`${url} -> ${String(e?.message || e)}`);
+    }
   }
+
+  return {
+    value: null,
+    source: {
+      provider: "fred",
+      series: seriesId,
+      note: "real_yield_fetch_failed",
+      detail: errors.join(" | ").slice(0, 500)
+    },
+    error: "real_yield_fetch_failed"
+  };
+}
+
+function parseFredCsvLatestValue(text, seriesId) {
+  if (!text || typeof text !== "string") {
+    throw new Error(`Empty CSV for ${seriesId}`);
+  }
+
+  const cleaned = text.replace(/^\uFEFF/, "").trim();
+  const lines = cleaned.split(/\r?\n/).filter(Boolean);
+
+  if (lines.length < 2) {
+    throw new Error(`Too few CSV lines for ${seriesId}`);
+  }
+
+  for (let i = lines.length - 1; i >= 1; i--) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const parts = line.split(",");
+    if (parts.length < 2) continue;
+
+    const raw = parts[1].replace(/^"|"$/g, "").trim();
+
+    if (!raw || raw === "." || raw === "NaN") continue;
+
+    const value = parseFloat(raw);
+    if (Number.isFinite(value)) return value;
+  }
+
+  throw new Error(`No numeric value found for ${seriesId}`);
 }
 
 async function getSetfGoldPriceSafe() {
