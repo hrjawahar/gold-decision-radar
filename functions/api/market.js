@@ -125,24 +125,13 @@ async function getRealYieldSafe() {
     `https://fred.stlouisfed.org/series/${encodeURIComponent(seriesId)}/downloaddata/${encodeURIComponent(seriesId)}.csv`
   ];
 
-  const headers = {
-    "accept": "text/csv,text/plain,*/*",
-    "accept-language": "en-US,en;q=0.9",
-    "cache-control": "no-cache",
-    "pragma": "no-cache",
-    "referer": "https://fred.stlouisfed.org/",
-    "user-agent": "Mozilla/5.0"
-  };
-
   const errors = [];
 
   for (const url of urls) {
     try {
       const res = await fetch(url, {
         method: "GET",
-        headers,
-        redirect: "follow",
-        cf: { cacheTtl: 300, cacheEverything: false }
+        redirect: "follow"
       });
 
       if (!res.ok) {
@@ -201,7 +190,7 @@ function parseFredCsvLatestValue(text, seriesId) {
     const parts = line.split(",");
     if (parts.length < 2) continue;
 
-    const raw = parts[1].replace(/^"|"$/g, "").trim();
+    const raw = String(parts[1] || "").replace(/^"|"$/g, "").trim();
 
     if (!raw || raw === "." || raw === "NaN") continue;
 
@@ -211,7 +200,6 @@ function parseFredCsvLatestValue(text, seriesId) {
 
   throw new Error(`No numeric value found for ${seriesId}`);
 }
-
 async function getSetfGoldPriceSafe() {
   try {
     const y = await fetchYahooQuote("SETFGOLD.NS");
