@@ -30,7 +30,7 @@ export async function onRequestGet() {
       sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
 
       asOf: new Date().toISOString(),
-      contractVersion: 4,
+      contractVersion: 5,
 
       quality: {
         dxy: numberOrNull(dxyObj?.value) !== null ? "ok" : "missing",
