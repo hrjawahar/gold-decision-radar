@@ -134,7 +134,13 @@ async function getRealYieldSafe() {
     } catch (e2) {
       return {
         value: null,
-        source: { provider: "fred", series: "DFII10", note: "real_yield_fetch_failed" },
+        source: {
+          provider: "fred",
+          series: "DFII10",
+          note: "real_yield_fetch_failed",
+          err1: String(e1?.message || e1),
+          err2: String(e2?.message || e2)
+        },
         error: "real_yield_fetch_failed"
       };
     }
