@@ -11,14 +11,21 @@ export async function onRequestGet() {
       getSbiGoldEtfInavSafe()
     ]);
 
+    const fedObj = buildFedSignal(realYieldObj?.value);
+
     const result = {
       dxy: numberOrNull(dxyObj?.value),
 
       usdInr: numberOrNull(inrObj?.value),
       usdInrChangePct30d: numberOrNull(inrObj?.pct30d),
-      usdInrTrend: inrObj?.trend ?? null,
+      usdInrTrend: inrObj?.trend ?? "stable",
 
       realYield: numberOrNull(realYieldObj?.value),
+      realYieldAsOf: realYieldObj?.asOf ?? null,
+
+      fedSignal: fedObj.signal,
+      fedSignalScore: fedObj.score,
+      fedSignalReason: fedObj.reason,
 
       setfGoldPrice: numberOrNull(goldObj?.value),
       setfGoldPriceAsOf: goldObj?.asOf ?? null,
@@ -30,12 +37,13 @@ export async function onRequestGet() {
       sbiGoldEtfInavAsOf: sbiInavObj?.asOf ?? null,
 
       asOf: new Date().toISOString(),
-      contractVersion: 5,
+      contractVersion: 6,
 
       quality: {
         dxy: numberOrNull(dxyObj?.value) !== null ? "ok" : "missing",
         usdInr: numberOrNull(inrObj?.value) !== null ? "ok" : "missing",
         realYield: numberOrNull(realYieldObj?.value) !== null ? "ok" : "missing",
+        fedSignal: fedObj.signal !== "unknown" ? "ok" : "missing",
         setfGoldPrice: numberOrNull(goldObj?.value) !== null ? "ok" : "missing",
         rsi14Setfgold: numberOrNull(rsiObj?.value) !== null ? "ok" : "missing",
         sbiGoldEtfInav: numberOrNull(sbiInavObj?.value) !== null ? "ok" : "missing"
@@ -45,6 +53,14 @@ export async function onRequestGet() {
         dxy: dxyObj?.source ?? null,
         usdInr: inrObj?.source ?? null,
         realYield: realYieldObj?.source ?? null,
+        fedSignal: {
+          provider: "derived",
+          basis: "realYield",
+          thresholds: {
+            dovish_max: 1.2,
+            neutral_max: 1.8
+          }
+        },
         setfGoldPrice: goldObj?.source ?? null,
         rsi14Setfgold: rsiObj?.source ?? null,
         sbiGoldEtfInav: sbiInavObj?.source ?? null
@@ -89,6 +105,42 @@ function compactErrors(arr) {
   return arr.filter(Boolean);
 }
 
+function monthPadded(n) {
+  return String(n).padStart(2, "0");
+}
+
+function buildFedSignal(realYield) {
+  if (!Number.isFinite(realYield)) {
+    return {
+      signal: "unknown",
+      score: 0,
+      reason: "Real yield unavailable"
+    };
+  }
+
+  if (realYield <= 1.2) {
+    return {
+      signal: "dovish",
+      score: 1,
+      reason: "Low real yield usually supports easier financial conditions and gold"
+    };
+  }
+
+  if (realYield <= 1.8) {
+    return {
+      signal: "neutral",
+      score: 0,
+      reason: "Mid-range real yield suggests mixed Fed pressure"
+    };
+  }
+
+  return {
+    signal: "hawkish",
+    score: -1,
+    reason: "Higher real yield usually reflects tighter Fed/financial conditions and is less supportive for gold"
+    };
+}
+
 /* -------------------- factor fetchers -------------------- */
 
 async function getDxySafe() {
@@ -117,58 +169,160 @@ async function getUsdInrSafe() {
   }
 }
 
-async function getRealYieldSafe() {
-  const seriesId = "DFII10";
+/* -------------------- REAL YIELD: Treasury primary, FRED backup -------------------- */
 
-  const urls = [
+async function getRealYieldSafe() {
+  const errors = [];
+
+  try {
+    return await getRealYieldFromTreasuryTextView();
+  } catch (e) {
+    errors.push(`treasury -> ${String(e?.message || e)}`);
+  }
+
+  try {
+    return await getRealYieldFromFredCsv("DFII10");
+  } catch (e) {
+    errors.push(`fred -> ${String(e?.message || e)}`);
+  }
+
+  return {
+    value: null,
+    asOf: null,
+    source: {
+      provider: "treasury/fred",
+      series: "DFII10",
+      note: "real_yield_fetch_failed",
+      detail: errors.join(" | ").slice(0, 700)
+    },
+    error: "real_yield_fetch_failed"
+  };
+}
+
+async function getRealYieldFromTreasuryTextView() {
+  const year = new Date().getUTCFullYear();
+  const url = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?field_tdr_date_value=${year}&type=daily_treasury_real_yield_curve&_=${Date.now()}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    redirect: "follow",
+    headers: {
+      "accept": "text/html, text/plain;q=0.9, */*;q=0.8",
+      "cache-control": "no-cache",
+      "pragma": "no-cache",
+      "user-agent": "Mozilla/5.0"
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Treasury TextView HTTP ${res.status}`);
+  }
+
+  const text = await res.text();
+  const parsed = parseTreasuryRealYieldTextView(text);
+
+  if (!parsed || !Number.isFinite(parsed.value)) {
+    throw new Error("Treasury real yield parse failed");
+  }
+
+  return {
+    value: parsed.value,
+    asOf: parsed.asOf,
+    source: {
+      provider: "treasury",
+      type: "daily_treasury_real_yield_curve",
+      url
+    }
+  };
+}
+
+function parseTreasuryRealYieldTextView(text) {
+  if (!text || typeof text !== "string") {
+    throw new Error("Treasury response empty");
+  }
+
+  const lines = text
+    .replace(/\u00a0/g, " ")
+    .split(/\r?\n/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const rowRegex = /^(\d{2}\/\d{2}\/\d{4})\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\b/;
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    const m = line.match(rowRegex);
+    if (!m) continue;
+
+    const rawDate = m[1];
+    const tenYearRaw = m[4]; // columns: 5Y, 7Y, 10Y, 20Y, 30Y
+
+    if (!tenYearRaw || tenYearRaw === "N/A") continue;
+
+    const value = Number(tenYearRaw);
+    if (!Number.isFinite(value)) continue;
+
+    const [mm, dd, yyyy] = rawDate.split("/");
+    const asOf = `${yyyy}-${mm}-${dd}`;
+
+    return { value, asOf };
+  }
+
+  throw new Error("No valid Treasury 10Y real yield row found");
+}
+
+async function getRealYieldFromFredCsv(seriesId) {
+  const baseUrls = [
     `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`,
     `https://fred.stlouisfed.org/series/${encodeURIComponent(seriesId)}/downloaddata/${encodeURIComponent(seriesId)}.csv`
   ];
 
   const errors = [];
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        redirect: "follow"
-      });
+  for (const baseUrl of baseUrls) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const url = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}_=${Date.now()}`;
 
-      if (!res.ok) {
-        errors.push(`${url} -> HTTP ${res.status}`);
-        continue;
-      }
-
-      const text = await res.text();
-      const value = parseFredCsvLatestValue(text, seriesId);
-
-      if (Number.isFinite(value)) {
-        return {
-          value,
-          source: {
-            provider: "fred",
-            series: seriesId,
-            url
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          redirect: "follow",
+          headers: {
+            "accept": "text/csv,text/plain;q=0.9,*/*;q=0.8",
+            "cache-control": "no-cache",
+            "pragma": "no-cache",
+            "user-agent": "Mozilla/5.0"
           }
-        };
-      }
+        });
 
-      errors.push(`${url} -> parse_failed`);
-    } catch (e) {
-      errors.push(`${url} -> ${String(e?.message || e)}`);
+        if (!res.ok) {
+          errors.push(`${baseUrl} -> HTTP ${res.status} (attempt ${attempt})`);
+          continue;
+        }
+
+        const text = await res.text();
+        const parsed = parseFredCsvLatestValue(text, seriesId);
+
+        if (parsed && Number.isFinite(parsed.value)) {
+          return {
+            value: parsed.value,
+            asOf: parsed.asOf,
+            source: {
+              provider: "fred",
+              series: seriesId,
+              url: baseUrl
+            }
+          };
+        }
+
+        errors.push(`${baseUrl} -> parse_failed (attempt ${attempt})`);
+      } catch (e) {
+        errors.push(`${baseUrl} -> ${String(e?.message || e)} (attempt ${attempt})`);
+      }
     }
   }
 
-  return {
-    value: null,
-    source: {
-      provider: "fred",
-      series: seriesId,
-      note: "real_yield_fetch_failed",
-      detail: errors.join(" | ").slice(0, 500)
-    },
-    error: "real_yield_fetch_failed"
-  };
+  throw new Error(errors.join(" | ").slice(0, 500));
 }
 
 function parseFredCsvLatestValue(text, seriesId) {
@@ -177,29 +331,36 @@ function parseFredCsvLatestValue(text, seriesId) {
   }
 
   const cleaned = text.replace(/^\uFEFF/, "").trim();
-  const lines = cleaned.split(/\r?\n/).filter(Boolean);
+  const lines = cleaned.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 
   if (lines.length < 2) {
     throw new Error(`Too few CSV lines for ${seriesId}`);
   }
 
   for (let i = lines.length - 1; i >= 1; i--) {
-    const line = lines[i].trim();
+    const line = lines[i];
     if (!line) continue;
 
-    const parts = line.split(",");
-    if (parts.length < 2) continue;
+    const firstComma = line.indexOf(",");
+    if (firstComma === -1) continue;
 
-    const raw = String(parts[1] || "").replace(/^"|"$/g, "").trim();
+    const rawDate = line.slice(0, firstComma).replace(/^"|"$/g, "").trim();
+    const rawValue = line.slice(firstComma + 1).replace(/^"|"$/g, "").trim();
 
-    if (!raw || raw === "." || raw === "NaN") continue;
+    if (!rawValue || rawValue === "." || rawValue === "NaN") continue;
 
-    const value = parseFloat(raw);
-    if (Number.isFinite(value)) return value;
+    const value = Number(rawValue);
+    if (Number.isFinite(value)) {
+      return {
+        value,
+        asOf: rawDate || null
+      };
+    }
   }
 
   throw new Error(`No numeric value found for ${seriesId}`);
 }
+
 async function getSetfGoldPriceSafe() {
   try {
     const y = await fetchYahooQuote("SETFGOLD.NS");
@@ -344,12 +505,16 @@ async function getSbiGoldEtfInavSafe() {
 
     if (!row) throw new Error("SBI Gold ETF not found in Data");
 
-    const inav = parseFloat(row.LatestNAV);
+    const inav =
+      Number(row.LatestNAV) ||
+      Number(row.iNAV) ||
+      Number(row.NAV);
+
     if (!Number.isFinite(inav)) throw new Error("SBI Gold ETF LatestNAV not numeric");
 
     return {
       value: inav,
-      asOf: row.LatestNAVDate || null,
+      asOf: row.LatestNAVDate || row.NavDate || null,
       source: {
         provider: "sbimf",
         endpoint: "/home/GetETFNAVDetailsAsync",
@@ -373,7 +538,7 @@ async function getSbiGoldEtfInavSafe() {
 /* -------------------- yahoo helpers -------------------- */
 
 async function fetchYahooQuote(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d&_=${Date.now()}`;
   const res = await fetch(url, {
     headers: {
       "user-agent": "Mozilla/5.0",
@@ -400,7 +565,7 @@ async function fetchYahooQuote(symbol) {
 }
 
 async function fetchYahooChart(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1d&_=${Date.now()}`;
   const res = await fetch(url, {
     headers: {
       "user-agent": "Mozilla/5.0",
@@ -420,8 +585,8 @@ async function fetchYahooChart(symbol) {
     (typeof meta.previousClose === "number" && Number.isFinite(meta.previousClose) ? meta.previousClose : null);
 
   const closes = result?.indicators?.quote?.[0]?.close || [];
-  const first = closes.find((x) => typeof x === "number" && Number.isFinite(x));
-  const last = [...closes].reverse().find((x) => typeof x === "number" && Number.isFinite(x));
+  const first = closes.find(x => typeof x === "number" && Number.isFinite(x));
+  const last = [...closes].reverse().find(x => typeof x === "number" && Number.isFinite(x));
 
   let pctChangeFromFirstPoint = null;
   if (typeof first === "number" && typeof last === "number" && first !== 0) {
@@ -432,7 +597,7 @@ async function fetchYahooChart(symbol) {
 }
 
 async function fetchYahooCloses(symbol, range = "3mo", interval = "1d") {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&_=${Date.now()}`;
   const res = await fetch(url, {
     headers: {
       "user-agent": "Mozilla/5.0",
@@ -458,11 +623,16 @@ async function fetchYahooCloses(symbol, range = "3mo", interval = "1d") {
   return { closes, asOf };
 }
 
-/* -------------------- stooq / fred helpers -------------------- */
+/* -------------------- stooq helpers -------------------- */
 
 async function fetchStooqClose(symbol, computePct = false) {
-  const url = `https://stooq.com/q/l/?s=${encodeURIComponent(symbol)}&i=d`;
-  const res = await fetch(url, { headers: { "accept": "text/csv" } });
+  const url = `https://stooq.com/q/l/?s=${encodeURIComponent(symbol)}&i=d&_=${Date.now()}`;
+  const res = await fetch(url, {
+    headers: {
+      "accept": "text/csv",
+      "user-agent": "Mozilla/5.0"
+    }
+  });
 
   if (!res.ok) throw new Error(`Stooq fetch failed for ${symbol}: HTTP ${res.status}`);
 
@@ -473,6 +643,8 @@ async function fetchStooqClose(symbol, computePct = false) {
   const rows = lines.slice(1, 31).map(line => line.split(",")).filter(p => p.length >= 5);
   const closes = rows.map(r => parseFloat(r[4])).filter(n => Number.isFinite(n));
 
+  if (!closes.length) throw new Error(`Stooq close parse failed for ${symbol}`);
+
   const last = closes[0];
   const oldest = closes[closes.length - 1];
 
@@ -482,24 +654,4 @@ async function fetchStooqClose(symbol, computePct = false) {
   }
 
   return { last, pct30d };
-}
-
-async function fetchFredLastValue(seriesId) {
-  const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`;
-  const res = await fetch(url, { headers: { "accept": "text/csv" } });
-
-  if (!res.ok) throw new Error(`FRED fetch failed for ${seriesId}: HTTP ${res.status}`);
-
-  const text = await res.text();
-  const lines = text.trim().split(/\r?\n/);
-
-  for (let i = lines.length - 1; i >= 1; i--) {
-    const parts = lines[i].split(",");
-    if (parts.length >= 2) {
-      const v = parseFloat(parts[1]);
-      if (Number.isFinite(v)) return v;
-    }
-  }
-
-  throw new Error(`No numeric value found in FRED CSV for ${seriesId}`);
 }
