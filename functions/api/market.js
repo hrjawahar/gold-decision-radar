@@ -271,27 +271,36 @@ function parseTreasuryRealYieldCsv(text) {
     throw new Error(`Treasury CSV header missing Date/10 Yr: ${header.join(" | ")}`);
   }
 
-  for (let i = lines.length - 1; i >= 1; i--) {
+  const validRows = [];
+
+  for (let i = 1; i < lines.length; i++) {
     const row = splitCsvLine(lines[i]).map(s => s.trim().replace(/^"|"$/g, ""));
     if (row.length <= Math.max(dateIdx, tenIdx)) continue;
 
     const rawDate = row[dateIdx];
     const rawValue = row[tenIdx];
 
-    if (!rawValue || rawValue === "N/A") continue;
+    if (!rawDate || !rawValue || rawValue === "N/A") continue;
 
     const value = Number(rawValue);
     if (!Number.isFinite(value)) continue;
 
-    return {
-      value,
-      asOf: normalizeUsDate(rawDate)
-    };
+    const isoDate = normalizeUsDate(rawDate);
+    if (!isoDate) continue;
+
+    validRows.push({
+      asOf: isoDate,
+      value
+    });
   }
 
-  throw new Error("No numeric 10Y real yield found in Treasury CSV");
-}
+  if (!validRows.length) {
+    throw new Error("No numeric 10Y real yield found in Treasury CSV");
+  }
 
+  validRows.sort((a, b) => a.asOf.localeCompare(b.asOf));
+  return validRows[validRows.length - 1];
+}
 async function getRealYieldFromTreasuryTextView() {
   const year = new Date().getUTCFullYear();
   const url =
