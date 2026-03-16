@@ -171,13 +171,21 @@ async function getUsdInrSafe() {
 
 /* -------------------- REAL YIELD: Treasury primary, FRED backup -------------------- */
 
+/* -------------------- REAL YIELD: Treasury CSV primary, Treasury HTML backup, FRED last -------------------- */
+
 async function getRealYieldSafe() {
   const errors = [];
 
   try {
+    return await getRealYieldFromTreasuryCsv();
+  } catch (e) {
+    errors.push(`treasury_csv -> ${String(e?.message || e)}`);
+  }
+
+  try {
     return await getRealYieldFromTreasuryTextView();
   } catch (e) {
-    errors.push(`treasury -> ${String(e?.message || e)}`);
+    errors.push(`treasury_html -> ${String(e?.message || e)}`);
   }
 
   try {
@@ -199,15 +207,102 @@ async function getRealYieldSafe() {
   };
 }
 
-async function getRealYieldFromTreasuryTextView() {
+async function getRealYieldFromTreasuryCsv() {
   const year = new Date().getUTCFullYear();
-  const url = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?field_tdr_date_value=${year}&type=daily_treasury_real_yield_curve&_=${Date.now()}`;
+
+  // Treasury nominal rates already expose a CSV endpoint with this shape.
+  // For real yields, the same family works with type=daily_treasury_real_yield_curve.
+  const url =
+    `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/` +
+    `daily-treasury-rates.csv/${year}/all?_format=csv&field_tdr_date_value=${year}` +
+    `&page=&type=daily_treasury_real_yield_curve&_=${Date.now()}`;
 
   const res = await fetch(url, {
     method: "GET",
     redirect: "follow",
     headers: {
-      "accept": "text/html, text/plain;q=0.9, */*;q=0.8",
+      "accept": "text/csv,text/plain;q=0.9,*/*;q=0.8",
+      "cache-control": "no-cache",
+      "pragma": "no-cache",
+      "user-agent": "Mozilla/5.0"
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Treasury CSV HTTP ${res.status}`);
+  }
+
+  const text = await res.text();
+  const parsed = parseTreasuryRealYieldCsv(text);
+
+  if (!parsed || !Number.isFinite(parsed.value)) {
+    throw new Error("Treasury CSV parse failed");
+  }
+
+  return {
+    value: parsed.value,
+    asOf: parsed.asOf,
+    source: {
+      provider: "treasury",
+      type: "daily_treasury_real_yield_curve",
+      format: "csv",
+      url
+    }
+  };
+}
+
+function parseTreasuryRealYieldCsv(text) {
+  if (!text || typeof text !== "string") {
+    throw new Error("Treasury CSV empty");
+  }
+
+  const cleaned = text.replace(/^\uFEFF/, "").trim();
+  const lines = cleaned.split(/\r?\n/).filter(Boolean);
+
+  if (lines.length < 2) {
+    throw new Error("Treasury CSV too few lines");
+  }
+
+  const header = splitCsvLine(lines[0]).map(s => s.trim().replace(/^"|"$/g, ""));
+  const tenIdx = header.findIndex(h => /^10\s*yr$/i.test(h) || /^10\s*year$/i.test(h));
+  const dateIdx = header.findIndex(h => /^date$/i.test(h));
+
+  if (dateIdx === -1 || tenIdx === -1) {
+    throw new Error(`Treasury CSV header missing Date/10 Yr: ${header.join(" | ")}`);
+  }
+
+  for (let i = lines.length - 1; i >= 1; i--) {
+    const row = splitCsvLine(lines[i]).map(s => s.trim().replace(/^"|"$/g, ""));
+    if (row.length <= Math.max(dateIdx, tenIdx)) continue;
+
+    const rawDate = row[dateIdx];
+    const rawValue = row[tenIdx];
+
+    if (!rawValue || rawValue === "N/A") continue;
+
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) continue;
+
+    return {
+      value,
+      asOf: normalizeUsDate(rawDate)
+    };
+  }
+
+  throw new Error("No numeric 10Y real yield found in Treasury CSV");
+}
+
+async function getRealYieldFromTreasuryTextView() {
+  const year = new Date().getUTCFullYear();
+  const url =
+    `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/` +
+    `TextView?field_tdr_date_value=${year}&type=daily_treasury_real_yield_curve&_=${Date.now()}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    redirect: "follow",
+    headers: {
+      "accept": "text/html,text/plain;q=0.9,*/*;q=0.8",
       "cache-control": "no-cache",
       "pragma": "no-cache",
       "user-agent": "Mozilla/5.0"
@@ -218,11 +313,11 @@ async function getRealYieldFromTreasuryTextView() {
     throw new Error(`Treasury TextView HTTP ${res.status}`);
   }
 
-  const text = await res.text();
-  const parsed = parseTreasuryRealYieldTextView(text);
+  const html = await res.text();
+  const parsed = parseTreasuryRealYieldHtml(html);
 
   if (!parsed || !Number.isFinite(parsed.value)) {
-    throw new Error("Treasury real yield parse failed");
+    throw new Error("Treasury HTML parse failed");
   }
 
   return {
@@ -231,134 +326,95 @@ async function getRealYieldFromTreasuryTextView() {
     source: {
       provider: "treasury",
       type: "daily_treasury_real_yield_curve",
+      format: "html",
       url
     }
   };
 }
 
-function parseTreasuryRealYieldTextView(text) {
-  if (!text || typeof text !== "string") {
-    throw new Error("Treasury response empty");
+function parseTreasuryRealYieldHtml(html) {
+  if (!html || typeof html !== "string") {
+    throw new Error("Treasury HTML empty");
   }
 
-  const lines = text
-    .replace(/\u00a0/g, " ")
-    .split(/\r?\n/)
-    .map(s => s.trim())
-    .filter(Boolean);
+  // Grab table rows, then table cells.
+  const rowMatches = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+  if (!rowMatches.length) {
+    throw new Error("No <tr> rows found");
+  }
 
-  const rowRegex = /^(\d{2}\/\d{2}\/\d{4})\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\s+([0-9.]+|N\/A)\b/;
+  for (let i = rowMatches.length - 1; i >= 0; i--) {
+    const rowHtml = rowMatches[i][1];
+    const cells = [...rowHtml.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+      .map(m => stripHtml(m[1]).trim())
+      .filter(Boolean);
 
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    const m = line.match(rowRegex);
-    if (!m) continue;
+    // Expected row shape: Date, 5 YR, 7 YR, 10 YR, 20 YR, 30 YR
+    if (cells.length < 4) continue;
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(cells[0])) continue;
 
-    const rawDate = m[1];
-    const tenYearRaw = m[4]; // columns: 5Y, 7Y, 10Y, 20Y, 30Y
+    const rawDate = cells[0];
+    const raw10yr = cells[3];
 
-    if (!tenYearRaw || tenYearRaw === "N/A") continue;
+    if (!raw10yr || /^n\/a$/i.test(raw10yr)) continue;
 
-    const value = Number(tenYearRaw);
+    const value = Number(raw10yr.replace(/[^0-9.\-]/g, ""));
     if (!Number.isFinite(value)) continue;
 
-    const [mm, dd, yyyy] = rawDate.split("/");
-    const asOf = `${yyyy}-${mm}-${dd}`;
-
-    return { value, asOf };
+    return {
+      value,
+      asOf: normalizeUsDate(rawDate)
+    };
   }
 
   throw new Error("No valid Treasury 10Y real yield row found");
 }
 
-async function getRealYieldFromFredCsv(seriesId) {
-  const baseUrls = [
-    `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(seriesId)}`,
-    `https://fred.stlouisfed.org/series/${encodeURIComponent(seriesId)}/downloaddata/${encodeURIComponent(seriesId)}.csv`
-  ];
-
-  const errors = [];
-
-  for (const baseUrl of baseUrls) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      const url = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}_=${Date.now()}`;
-
-      try {
-        const res = await fetch(url, {
-          method: "GET",
-          redirect: "follow",
-          headers: {
-            "accept": "text/csv,text/plain;q=0.9,*/*;q=0.8",
-            "cache-control": "no-cache",
-            "pragma": "no-cache",
-            "user-agent": "Mozilla/5.0"
-          }
-        });
-
-        if (!res.ok) {
-          errors.push(`${baseUrl} -> HTTP ${res.status} (attempt ${attempt})`);
-          continue;
-        }
-
-        const text = await res.text();
-        const parsed = parseFredCsvLatestValue(text, seriesId);
-
-        if (parsed && Number.isFinite(parsed.value)) {
-          return {
-            value: parsed.value,
-            asOf: parsed.asOf,
-            source: {
-              provider: "fred",
-              series: seriesId,
-              url: baseUrl
-            }
-          };
-        }
-
-        errors.push(`${baseUrl} -> parse_failed (attempt ${attempt})`);
-      } catch (e) {
-        errors.push(`${baseUrl} -> ${String(e?.message || e)} (attempt ${attempt})`);
-      }
-    }
-  }
-
-  throw new Error(errors.join(" | ").slice(0, 500));
+function stripHtml(s) {
+  return String(s || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function parseFredCsvLatestValue(text, seriesId) {
-  if (!text || typeof text !== "string") {
-    throw new Error(`Empty CSV for ${seriesId}`);
-  }
+function splitCsvLine(line) {
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
 
-  const cleaned = text.replace(/^\uFEFF/, "").trim();
-  const lines = cleaned.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    const next = line[i + 1];
 
-  if (lines.length < 2) {
-    throw new Error(`Too few CSV lines for ${seriesId}`);
-  }
-
-  for (let i = lines.length - 1; i >= 1; i--) {
-    const line = lines[i];
-    if (!line) continue;
-
-    const firstComma = line.indexOf(",");
-    if (firstComma === -1) continue;
-
-    const rawDate = line.slice(0, firstComma).replace(/^"|"$/g, "").trim();
-    const rawValue = line.slice(firstComma + 1).replace(/^"|"$/g, "").trim();
-
-    if (!rawValue || rawValue === "." || rawValue === "NaN") continue;
-
-    const value = Number(rawValue);
-    if (Number.isFinite(value)) {
-      return {
-        value,
-        asOf: rawDate || null
-      };
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
     }
+
+    if (ch === "," && !inQuotes) {
+      out.push(cur);
+      cur = "";
+      continue;
+    }
+
+    cur += ch;
   }
 
-  throw new Error(`No numeric value found for ${seriesId}`);
+  out.push(cur);
+  return out;
+}
+
+function normalizeUsDate(rawDate) {
+  if (!rawDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)) return rawDate || null;
+  const [mm, dd, yyyy] = rawDate.split("/");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 async function getSetfGoldPriceSafe() {
@@ -383,23 +439,35 @@ async function getSetfGoldPriceSafe() {
 }
 
 async function getDxy() {
-  try {
-    const y = await fetchYahooChart("DX-Y.NYB");
-    if (Number.isFinite(y.latestPrice)) {
-      return {
-        value: y.latestPrice,
-        source: { provider: "yahoo", symbol: "DX-Y.NYB" }
-      };
-    }
-  } catch (e) {}
+  const yahooSymbols = ["DX-Y.NYB", "DX=F"];
 
-  const s = await fetchStooqClose("dx.f");
-  return {
-    value: s.last,
-    source: { provider: "stooq", symbol: "dx.f" }
-  };
+  for (const symbol of yahooSymbols) {
+    try {
+      const y = await fetchYahooChart(symbol);
+      if (Number.isFinite(y.latestPrice)) {
+        return {
+          value: y.latestPrice,
+          source: { provider: "yahoo", symbol }
+        };
+      }
+    } catch (e) {}
+  }
+
+  const stooqSymbols = ["dx.f", "usdidx"];
+  for (const symbol of stooqSymbols) {
+    try {
+      const s = await fetchStooqClose(symbol);
+      if (Number.isFinite(s.last)) {
+        return {
+          value: s.last,
+          source: { provider: "stooq", symbol }
+        };
+      }
+    } catch (e) {}
+  }
+
+  throw new Error("DXY unavailable from yahoo and stooq");
 }
-
 async function getUsdInr() {
   const pctToTrend = (pct) => {
     if (typeof pct !== "number" || !Number.isFinite(pct)) return "stable";
