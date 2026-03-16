@@ -207,11 +207,12 @@
           <div class="hint">Lower DXY is supportive for gold.</div>
         </div>
 
-        <div class="field">
-          <div class="label"><b>US 10Y Real Yield (%)</b><span id="ryScore" class="pill">Weight: 25%</span></div>
-          <input type="number" id="realYield" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
-          <div class="hint">Lower real yield is bullish for gold.</div>
-        </div>
+       <div class="field">
+  <div class="label"><b>US 10Y Real Yield (%)</b><span id="ryScore" class="pill">Weight: 25%</span></div>
+  <input type="number" id="realYield" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
+  <div class="hint">Lower real yield is bullish for gold.</div>
+  <div class="hint" id="realYieldAsOf">As of: —</div>
+</div>
 
         <div class="field">
           <div class="label"><b>Fed Tone (optional overlay)</b><span id="fedScore" class="pill">Overlay</span></div>
@@ -375,6 +376,12 @@
     return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${pct > 0 ? "premium" : "discount"}`;
   }
 
+  function backendFedSignalToTone(signal){
+    if(signal === "dovish") return "cuts_likely";
+    if(signal === "hawkish") return "hawkish";
+    return "neutral";
+  }
+
   function compute(){
     const dxy = toNum($("dxy")?.value ?? "");
     const realYield = toNum($("realYield")?.value ?? "");
@@ -505,6 +512,7 @@
     const payload = {
       dxy:$("dxy")?.value ?? "",
       realYield:$("realYield")?.value ?? "",
+      realYieldAsOf:$("realYieldAsOf")?.textContent ?? "As of: —",
       fedTone:$("fedTone")?.value ?? "neutral",
       geoRisk:$("geoRisk")?.value ?? "medium",
       inrTrend:$("inrTrend")?.value ?? "stable",
@@ -533,6 +541,7 @@
 
       if($("dxy") && d.dxy != null) $("dxy").value = d.dxy;
       if($("realYield") && d.realYield != null) $("realYield").value = d.realYield;
+      if($("realYieldAsOf") && d.realYieldAsOf != null) $("realYieldAsOf").textContent = d.realYieldAsOf;
       if($("fedTone") && d.fedTone) $("fedTone").value = d.fedTone;
       if($("geoRisk") && d.geoRisk) $("geoRisk").value = d.geoRisk;
       if($("inrTrend") && d.inrTrend) $("inrTrend").value = d.inrTrend;
@@ -565,6 +574,7 @@
 
     if($("dxy")) $("dxy").value = "";
     if($("realYield")) $("realYield").value = "";
+    if($("realYieldAsOf")) $("realYieldAsOf").textContent = "As of: —";
     if($("fedTone")) $("fedTone").value = "neutral";
     if($("geoRisk")) $("geoRisk").value = "medium";
     if($("inrTrend")) $("inrTrend").value = "stable";
@@ -603,6 +613,7 @@
     if(f?.dxy?.provider) parts.push(`DXY:${f.dxy.provider}`);
     if(f?.usdInr?.provider) parts.push(`USDINR:${f.usdInr.provider}`);
     if(f?.realYield?.provider) parts.push(`RY:${f.realYield.provider}`);
+    if(f?.fedSignal?.provider) parts.push(`FED:${f.fedSignal.provider}`);
     if(f?.setfGoldPrice?.provider) parts.push(`SETFGOLD:${f.setfGoldPrice.provider}`);
     if(f?.sbiGoldEtfInav?.provider) parts.push(`SBI iNAV:${f.sbiGoldEtfInav.provider}`);
     if(f?.rsi14Setfgold?.provider) parts.push(`RSI:${f.rsi14Setfgold.provider}`);
@@ -611,26 +622,62 @@
 
   async function autoFetch(){
     if ($("status")) $("status").textContent = "Status: fetching…";
+
     try{
       const res = await fetch("/api/market", { cache: "no-store" });
-      if(!res.ok) throw new Error(res.status);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const data = await res.json();
 
-      if ($("dxy") && Number.isFinite(data.dxy)) $("dxy").value = data.dxy.toFixed(2);
-      if ($("realYield") && Number.isFinite(data.realYield)) $("realYield").value = data.realYield.toFixed(2);
-      if ($("setfPrice") && Number.isFinite(data.setfGoldPrice)) $("setfPrice").value = data.setfGoldPrice.toFixed(2);
-      if ($("rsi14") && Number.isFinite(data.rsi14Setfgold)) $("rsi14").value = data.rsi14Setfgold.toFixed(1);
-      if ($("sbiInav") && Number.isFinite(data.sbiGoldEtfInav)) $("sbiInav").value = Number(data.sbiGoldEtfInav).toFixed(4);
-      if ($("sbiInavAsOf") && data.sbiGoldEtfInavAsOf) $("sbiInavAsOf").textContent = `As of: ${data.sbiGoldEtfInavAsOf}`;
-      if (data.usdInrTrend && $("inrTrend")) $("inrTrend").value = data.usdInrTrend;
+      if ($("dxy") && Number.isFinite(data.dxy)) {
+        $("dxy").value = data.dxy.toFixed(2);
+      }
+
+      if ($("realYield") && Number.isFinite(data.realYield)) {
+        $("realYield").value = data.realYield.toFixed(2);
+      }
+
+      if ($("realYieldAsOf")) {
+        $("realYieldAsOf").textContent = `As of: ${data.realYieldAsOf || "—"}`;
+      }
+
+      if ($("setfPrice") && Number.isFinite(data.setfGoldPrice)) {
+        $("setfPrice").value = data.setfGoldPrice.toFixed(2);
+      }
+
+      if ($("rsi14") && Number.isFinite(data.rsi14Setfgold)) {
+        $("rsi14").value = data.rsi14Setfgold.toFixed(1);
+      }
+
+      if ($("sbiInav") && Number.isFinite(data.sbiGoldEtfInav)) {
+        $("sbiInav").value = Number(data.sbiGoldEtfInav).toFixed(4);
+      }
+
+      if ($("sbiInavAsOf")) {
+        $("sbiInavAsOf").textContent = `As of: ${data.sbiGoldEtfInavAsOf || "—"}`;
+      }
+
+      if (data.usdInrTrend && $("inrTrend")) {
+        $("inrTrend").value = data.usdInrTrend;
+      }
+
+      if (data.fedSignal && $("fedTone")) {
+        $("fedTone").value = backendFedSignalToTone(data.fedSignal);
+      }
 
       if (Number.isFinite(data.usdInr)) {
         const pct = Number.isFinite(data.usdInrChangePct30d) ? data.usdInrChangePct30d : null;
         let arrow = "→";
         let cls = "inr-flat";
+
         if (pct !== null) {
-          if (pct > 0.2) { arrow = "↑"; cls = "inr-up"; }
-          else if (pct < -0.2) { arrow = "↓"; cls = "inr-down"; }
+          if (pct > 0.2) {
+            arrow = "↑";
+            cls = "inr-up";
+          } else if (pct < -0.2) {
+            arrow = "↓";
+            cls = "inr-down";
+          }
         }
 
         const pctText = (pct === null) ? "" : ` | 30d: ${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${arrow}`;
@@ -642,10 +689,26 @@
         }
       }
 
-      if($("asOf")) $("asOf").textContent = `As of: ${data.asOf || "—"}`;
-      if($("fresh")) $("fresh").textContent = formatSources(data.freshness);
+      if($("asOf")) {
+        $("asOf").textContent = `As of: ${data.asOf || "—"}`;
+      }
 
-      if ($("status")) $("status").textContent = "Status: fetched ✓";
+      if($("fresh")) {
+        $("fresh").textContent = formatSources(data.freshness);
+      }
+
+      const errors = Array.isArray(data.errors) ? data.errors : [];
+      const quality = data.quality || {};
+      const okCount = Object.values(quality).filter(v => v === "ok").length;
+
+      if (errors.length === 0) {
+        if ($("status")) $("status").textContent = "Status: fetched ✓";
+      } else if (okCount > 0) {
+        if ($("status")) $("status").textContent = `Status: partial fetch ✓ (${errors.join(", ")})`;
+      } else {
+        if ($("status")) $("status").textContent = "Status: fetch failed (manual works)";
+      }
+
       compute();
       save();
     } catch(e) {
@@ -670,5 +733,3 @@
   compute();
   if(!hadSaved) autoFetch();
 </script>
-</body>
-</html>
