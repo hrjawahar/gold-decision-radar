@@ -94,20 +94,26 @@ async function getDxy() {
 /* ---------------- USDINR ---------------- */
 
 async function getUsdInr() {
- const rows = await fetchCsv("https://stooq.com/q/d/l/?s=inr=x&i=d");
-  const closes = rows.map(r => Number(r.close)).filter(Number.isFinite);
-  const last = closes.at(-1);
-  const first = closes.at(-22);
+  const j = await fetchJson(
+    "https://query1.finance.yahoo.com/v8/finance/chart/INR=X?range=1mo&interval=1d"
+  );
 
-  const pct = ((last - first) / first) * 100;
+  const closes =
+    j.chart.result[0].indicators.quote[0].close
+      .filter(x => typeof x === "number");
+
+  const latest = closes.at(-1);
+  const ref30 = closes.at(-22);
+
+  const pct = ((latest - ref30) / ref30) * 100;
 
   return {
-    value: last,
+    value: latest,
     pct30d: round2(pct),
-    trend: pct > 0.5 ? "weakening" : pct < -0.5 ? "strengthening" : "stable"
+    trend: pct > 0.5 ? "weakening" :
+           pct < -0.5 ? "strengthening" : "stable"
   };
 }
-
 /* ---------------- REAL YIELD ---------------- */
 
 async function getRealYield() {
