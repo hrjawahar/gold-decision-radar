@@ -348,13 +348,22 @@
     return 5;
   }
 
-  function scoreDomesticGold(val){
-    if(!Number.isFinite(val)) return null;
-    if(val >= 140) return 20;
-    if(val >= 130) return 15;
-    if(val >= 120) return 10;
-    return 5;
+  let lastSetf = null;
+
+function scoreDomesticGold(val){
+  if(!Number.isFinite(val)) return null;
+
+  let score = 10; // neutral base
+
+  if(lastSetf !== null){
+    if(val > lastSetf) score = 20;
+    else if(val === lastSetf) score = 12;
+    else score = 6;
   }
+
+  lastSetf = val;
+  return score;
+}
 
   function scoreDxy(val){
     if(!Number.isFinite(val)) return null;
