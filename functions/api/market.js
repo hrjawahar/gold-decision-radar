@@ -94,7 +94,7 @@ async function getDxy() {
 /* ---------------- USDINR ---------------- */
 
 async function getUsdInr() {
-  const rows = await fetchCsv("https://stooq.com/q/d/l/?s=usdinr&i=d");
+ const rows = await fetchCsv("https://stooq.com/q/d/l/?s=inr=x&i=d");
   const closes = rows.map(r => Number(r.close)).filter(Number.isFinite);
   const last = closes.at(-1);
   const first = closes.at(-22);
@@ -133,8 +133,13 @@ async function getRealYield() {
 /* ---------------- SETFGOLD ---------------- */
 
 async function getSetfGoldTrend(symbol) {
-  const rows = await fetchCsv(`https://stooq.com/q/d/l/?s=${symbol}&i=d`);
-  const closes = rows.map(r => Number(r.close)).filter(Number.isFinite);
+  const j = await fetchJson(
+    "https://query1.finance.yahoo.com/v8/finance/chart/SETFGOLD.NS?range=1mo&interval=1d"
+  );
+
+  const closes =
+    j.chart.result[0].indicators.quote[0].close
+      .filter(x => typeof x === "number");
 
   const latest = closes.at(-1);
   const prev = closes.at(-2);
@@ -153,10 +158,9 @@ async function getSetfGoldTrend(symbol) {
     changePct1d: round2(c1),
     changePct5d: round2(c5),
     trend,
-    asOf: rows.at(-1).date
+    asOf: new Date().toISOString()
   };
 }
-
 /* ---------------- RSI ---------------- */
 
 async function getRsi14(symbol) {
