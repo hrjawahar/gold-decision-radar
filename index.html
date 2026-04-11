@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Gold Decision Radar v4 India</title>
+  <title>Gold Decision Radar v4.1 India</title>
   <meta name="description" content="India-focused Gold Decision Radar with auto-fetch for DXY, US 10Y Real Yield, USD/INR trend, and optional SETFGOLD price." />
   <meta name="theme-color" content="#0b0f14" />
   <link rel="manifest" href="/manifest.json">
@@ -149,7 +149,7 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Gold Decision Radar v4 India</h1>
+      <h1>Gold Decision Radar v4.1 India</h1>
       <p class="sub"><b>India model:</b> USD/INR + Real Yield + Domestic Gold Price + DXY + Geo Risk, with RSI as timing overlay.</p>
     </div>
     <div class="actions">
@@ -188,15 +188,15 @@
       </div>
 
       <div class="field" style="grid-column: 1 / -1;">
-        <div class="label"><b>Domestic Gold Price / SETFGOLD Market Price (₹)</b><span id="pxScore" class="pill">Weight: 20%</span></div>
+        <div class="label"><b>Domestic Gold Price / SETFGOLD Market Price (₹)</b><span id="pxScore" class="pill">Weight: 25%</span></div>
         <input type="number" id="setfPrice" step="0.01" inputmode="decimal" placeholder="Auto-fetched if available, or enter manually" />
-        <div class="hint">Core factor. Higher domestic price strength supports gold trend.</div>
+        <div class="hint">Core factor. Uses previous fetched SETFGOLD value plus premium/discount vs SBI iNAV to reflect the April domestic-spot rule.</div>
       </div>
 
       <div class="field" style="grid-column: 1 / -1;">
         <div class="label"><b>SBI Gold ETF iNAV (₹)</b><span id="inavScore" class="pill">Overlay</span></div>
         <input type="number" id="sbiInav" step="0.0001" inputmode="decimal" placeholder="Enter latest SBI iNAV manually" />
-        <div class="hint" id="sbiInavRule">Overlay only: used to show premium / discount vs market price. Not part of core India score.</div>
+        <div class="hint" id="sbiInavRule">Now used inside domestic gold scoring as a small premium / discount adjustment after the April domestic valuation change.</div>
         <div class="hint" id="sbiInavAsOf">As of: —</div>
       </div>
 
@@ -208,7 +208,7 @@
         </div>
 
        <div class="field">
-  <div class="label"><b>US 10Y Real Yield (%)</b><span id="ryScore" class="pill">Weight: 25%</span></div>
+  <div class="label"><b>US 10Y Real Yield (%)</b><span id="ryScore" class="pill">Weight: 20%</span></div>
   <input type="number" id="realYield" step="0.01" inputmode="decimal" placeholder="Auto-fetched (or enter manually)" />
   <div class="hint">Lower real yield is bullish for gold.</div>
   <div class="hint" id="realYieldAsOf">As of: —</div>
@@ -225,7 +225,7 @@
         </div>
 
         <div class="field">
-          <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Weight: 10%</span></div>
+          <div class="label"><b>Geopolitics / Global Risk</b><span id="geoScore" class="pill">Weight: 5%</span></div>
           <select id="geoRisk">
             <option value="high">War / crisis escalating</option>
             <option value="medium" selected>Normal / elevated</option>
@@ -235,7 +235,7 @@
         </div>
 
         <div class="field" style="grid-column: 1 / -1;">
-          <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Weight: 35%</span></div>
+          <div class="label"><b>USD/INR Trend (30-day)</b><span id="inrScore" class="pill">Weight: 40%</span></div>
           <select id="inrTrend">
             <option value="weakening">INR weakening (USD/INR rising)</option>
             <option value="stable" selected>Stable / range-bound</option>
@@ -248,12 +248,13 @@
       <details style="margin-top:12px;">
         <summary>Decision logic</summary>
         <div class="hint" style="margin-top:8px;">
-          Core India score = USD/INR 35% + Real Yield 25% + Domestic Gold Price 20% + DXY 10% + Geo Risk 10%<br>
-          RSI is a timing layer only.<br><br>
-          Score ≥ 80 = BUY / ACCUMULATE<br>
-          50–79 = HOLD / SIP<br>
-          35–49 = WAIT<br>
-          &lt;35 = TRIM / AVOID
+          Core India score = USD/INR 40% + Real Yield 20% + Domestic Gold Price 25% + DXY 10% + Geo Risk 5%<br>
+          Domestic Gold score now uses previous fetched SETFGOLD price + SBI iNAV premium / discount adjustment.<br>
+          RSI remains a timing layer only.<br><br>
+          Score ≥ 70 = BUY / ACCUMULATE<br>
+          55–69 = HOLD / SIP<br>
+          45–54 = WAIT<br>
+          &lt;45 = TRIM / AVOID
         </div>
       </details>
 
@@ -295,6 +296,8 @@
 
   const $ = (id) => document.getElementById(id);
   const storageKey = "goldDecisionRadar:v4india";
+  let setfPrevRef = null;
+  let setfPrevRefAsOf = null;
   const toNum = (v) => {
     const n = parseFloat(v);
     return Number.isFinite(n) ? n : null;
@@ -334,36 +337,48 @@
   }
 
   function scoreUsdInrTrend(trend){
-    if(trend === "weakening") return 35;
-    if(trend === "stable") return 20;
-    if(trend === "strengthening") return 8;
+    if(trend === "weakening") return 40;
+    if(trend === "stable") return 24;
+    if(trend === "strengthening") return 10;
     return null;
   }
 
   function scoreRealYield(val){
     if(!Number.isFinite(val)) return null;
-    if(val <= 1.20) return 25;
-    if(val <= 1.60) return 18;
-    if(val <= 2.00) return 12;
-    return 5;
+    if(val <= 1.20) return 20;
+    if(val <= 1.60) return 14;
+    if(val <= 2.00) return 8;
+    return 3;
   }
 
-  let lastSetf = null;
+  function scoreDomesticGold(val, prevVal, inav){
+    if(!Number.isFinite(val)) return null;
 
-function scoreDomesticGold(val){
-  if(!Number.isFinite(val)) return null;
+    let score;
 
-  let score = 10; // neutral base
+    if(Number.isFinite(prevVal) && prevVal > 0){
+      const pct = ((val - prevVal) / prevVal) * 100;
 
-  if(lastSetf !== null){
-    if(val > lastSetf) score = 20;
-    else if(val === lastSetf) score = 12;
-    else score = 6;
+      if(pct > 0.75) score = 22;
+      else if(pct > 0.15) score = 18;
+      else if(pct >= -0.15) score = 13;
+      else if(pct >= -0.75) score = 9;
+      else score = 5;
+    } else {
+      if(val >= 140) score = 18;
+      else if(val >= 130) score = 15;
+      else if(val >= 120) score = 12;
+      else score = 9;
+    }
+
+    if(Number.isFinite(inav) && inav > 0){
+      const premiumPct = ((val - inav) / inav) * 100;
+      if(premiumPct > 0.20) score += 2;
+      else if(premiumPct < -0.20) score -= 1;
+    }
+
+    return Math.max(5, Math.min(25, score));
   }
-
-  lastSetf = val;
-  return score;
-}
 
   function scoreDxy(val){
     if(!Number.isFinite(val)) return null;
@@ -373,9 +388,9 @@ function scoreDomesticGold(val){
   }
 
   function scoreGeo(v){
-    if(v === "high") return 10;
-    if(v === "medium") return 6;
-    if(v === "low") return 3;
+    if(v === "high") return 5;
+    if(v === "medium") return 3;
+    if(v === "low") return 1;
     return null;
   }
 
@@ -384,6 +399,14 @@ function scoreDomesticGold(val){
     const pct = ((price - inav) / inav) * 100;
     return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% ${pct > 0 ? "premium" : "discount"}`;
   }
+  function setfTrendText(current, previous){
+    if(!Number.isFinite(current)) return "—";
+    if(!Number.isFinite(previous) || previous <= 0) return "No previous fetched ref";
+    const pct = ((current - previous) / previous) * 100;
+    const dir = pct > 0.15 ? "rising" : (pct < -0.15 ? "falling" : "flat");
+    return `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}% vs prev (${dir})`;
+  }
+
 
   function backendFedSignalToTone(signal){
     if(signal === "dovish") return "cuts_likely";
@@ -403,20 +426,20 @@ function scoreDomesticGold(val){
 
     const sInr = scoreUsdInrTrend(inrTrend);
     const sRy = scoreRealYield(realYield);
-    const sGold = scoreDomesticGold(setfPrice);
+    const sGold = scoreDomesticGold(setfPrice, setfPrevRef, sbiInav);
     const sDxy = scoreDxy(dxy);
     const sGeo = scoreGeo(geoRisk);
 
-    if ($("inrScore")) $("inrScore").textContent = `Score: ${sInr ?? "—"}/35`;
-    if ($("ryScore")) $("ryScore").textContent = `Score: ${sRy ?? "—"}/25`;
-    if ($("pxScore")) $("pxScore").textContent = `Score: ${sGold ?? "—"}/20`;
+    if ($("inrScore")) $("inrScore").textContent = `Score: ${sInr ?? "—"}/40`;
+    if ($("ryScore")) $("ryScore").textContent = `Score: ${sRy ?? "—"}/20`;
+    if ($("pxScore")) $("pxScore").textContent = `Score: ${sGold ?? "—"}/25`;
     if ($("dxyScore")) $("dxyScore").textContent = `Score: ${sDxy ?? "—"}/10`;
-    if ($("geoScore")) $("geoScore").textContent = `Score: ${sGeo ?? "—"}/10`;
+    if ($("geoScore")) $("geoScore").textContent = `Score: ${sGeo ?? "—"}/5`;
 
     const timing = rsiTiming(rsi);
     if ($("rsiScore")) $("rsiScore").textContent = `Timing: ${timing.tone}`;
     if ($("fedScore")) $("fedScore").textContent = `Overlay: ${fedToneLabel(fedTone)}`;
-    if ($("inavScore")) $("inavScore").textContent = `Overlay: ${premiumDiscountText(setfPrice, sbiInav)}`;
+    if ($("inavScore")) $("inavScore").textContent = `Trend/Px: ${setfTrendText(setfPrice, setfPrevRef)} | ${premiumDiscountText(setfPrice, sbiInav)}`;
 
     const missing = [];
     if (sInr === null) missing.push("USD/INR trend");
@@ -437,9 +460,10 @@ function scoreDomesticGold(val){
         const chips = [
           ["USD/INR", inrLabel(inrTrend), sInr ?? "—"],
           ["Real Yield", Number.isFinite(realYield) ? realYield.toFixed(2) : "—", sRy ?? "—"],
-          ["Domestic Gold", Number.isFinite(setfPrice) ? setfPrice.toFixed(2) : "—", sGold ?? "—"],
+          ["Domestic Gold", Number.isFinite(setfPrice) ? `${setfPrice.toFixed(2)} | ${setfTrendText(setfPrice, setfPrevRef)}` : "—", sGold ?? "—"],
           ["DXY", Number.isFinite(dxy) ? dxy.toFixed(2) : "—", sDxy ?? "—"],
           ["Geo Risk", geoLabel(geoRisk), sGeo ?? "—"],
+          ["Prev SETFGOLD ref", Number.isFinite(setfPrevRef) ? setfPrevRef.toFixed(2) : "—", setfPrevRefAsOf || "ref"],
           ["RSI Timing", timing.text, "overlay"],
           ["Fed", fedToneLabel(fedTone), "overlay"],
           ["Px vs iNAV", premiumDiscountText(setfPrice, sbiInav), "overlay"]
@@ -462,19 +486,19 @@ function scoreDomesticGold(val){
     let exp = "Mixed core signals.";
     let zone = "zone-hold";
 
-    if (total >= 80) {
+    if (total >= 70) {
       action = "BUY";
       label = "BUY / ACCUMULATE";
       cls = "good";
       exp = `Strong core setup. Timing: ${timing.text}.`;
       zone = "zone-buy";
-    } else if (total >= 50) {
+    } else if (total >= 55) {
       action = "HOLD";
       label = "HOLD / SIP";
       cls = "mid";
       exp = `Core trend is supportive but not decisive. Timing: ${timing.text}.`;
       zone = "zone-hold";
-    } else if (total >= 35) {
+    } else if (total >= 45) {
       action = "WAIT";
       label = "WAIT";
       cls = "mid";
@@ -497,11 +521,12 @@ function scoreDomesticGold(val){
     if (box){
       box.innerHTML = "";
       const chips = [
-        ["USD/INR", inrLabel(inrTrend), `${sInr}/35`],
-        ["Real Yield", realYield.toFixed(2), `${sRy}/25`],
-        ["Domestic Gold", setfPrice.toFixed(2), `${sGold}/20`],
+        ["USD/INR", inrLabel(inrTrend), `${sInr}/40`],
+        ["Real Yield", realYield.toFixed(2), `${sRy}/20`],
+        ["Domestic Gold", `${setfPrice.toFixed(2)} | ${setfTrendText(setfPrice, setfPrevRef)}`, `${sGold}/25`],
         ["DXY", dxy.toFixed(2), `${sDxy}/10`],
-        ["Geo Risk", geoLabel(geoRisk), `${sGeo}/10`],
+        ["Geo Risk", geoLabel(geoRisk), `${sGeo}/5`],
+        ["Prev SETFGOLD ref", Number.isFinite(setfPrevRef) ? setfPrevRef.toFixed(2) : "—", setfPrevRefAsOf || "ref"],
         ["RSI Timing", timing.text, "overlay"],
         ["Fed", fedToneLabel(fedTone), "overlay"],
         ["Px vs iNAV", premiumDiscountText(setfPrice, sbiInav), "overlay"]
@@ -533,6 +558,8 @@ function scoreDomesticGold(val){
       usdInrSpotClass:Array.from($("usdInrSpot")?.classList ?? []).join(" "),
       asOf:$("asOf")?.textContent ?? "As of: —",
       fresh:$("fresh")?.textContent ?? "Sources: —",
+      setfPrevRef:Number.isFinite(setfPrevRef) ? setfPrevRef : null,
+      setfPrevRefAsOf:setfPrevRefAsOf,
       lastSavedISO:new Date().toISOString()
     };
     localStorage.setItem(storageKey, JSON.stringify(payload));
@@ -560,6 +587,8 @@ function scoreDomesticGold(val){
       if($("sbiInavAsOf") && d.sbiInavAsOf != null) $("sbiInavAsOf").textContent = d.sbiInavAsOf;
       if($("asOf") && d.asOf) $("asOf").textContent = d.asOf;
       if($("fresh") && d.fresh) $("fresh").textContent = d.fresh;
+      setfPrevRef = Number.isFinite(Number(d.setfPrevRef)) ? Number(d.setfPrevRef) : null;
+      setfPrevRefAsOf = d.setfPrevRefAsOf || null;
 
       const spot = $("usdInrSpot");
       if (spot && d.usdInrSpot) {
@@ -594,6 +623,8 @@ function scoreDomesticGold(val){
     if($("asOf")) $("asOf").textContent = "As of: —";
     if($("fresh")) $("fresh").textContent = "Sources: —";
     if($("status")) $("status").textContent = "Status: ready";
+    setfPrevRef = null;
+    setfPrevRefAsOf = null;
 
     const el = $("usdInrSpot");
     if (el) {
@@ -651,7 +682,25 @@ function scoreDomesticGold(val){
       }
 
       if ($("setfPrice") && Number.isFinite(data.setfGoldPrice)) {
+        const currentDisplayedSetf = toNum($("setfPrice").value);
+        if (Number.isFinite(currentDisplayedSetf) && currentDisplayedSetf > 0 && currentDisplayedSetf !== Number(data.setfGoldPrice)) {
+          setfPrevRef = currentDisplayedSetf;
+          setfPrevRefAsOf = $("asOf")?.textContent?.replace(/^As of:\s*/, "") || null;
+        }
         $("setfPrice").value = data.setfGoldPrice.toFixed(2);
+        if (!Number.isFinite(setfPrevRef)) {
+          const savedRaw = localStorage.getItem(storageKey);
+          if (savedRaw) {
+            try {
+              const saved = JSON.parse(savedRaw);
+              const savedSetf = Number(saved?.setfPrice);
+              if (Number.isFinite(savedSetf) && savedSetf > 0 && savedSetf !== Number(data.setfGoldPrice)) {
+                setfPrevRef = savedSetf;
+                setfPrevRefAsOf = saved?.asOf ? String(saved.asOf).replace(/^As of:\s*/, "") : null;
+              }
+            } catch(e) {}
+          }
+        }
       }
 
       if ($("rsi14") && Number.isFinite(data.rsi14Setfgold)) {
