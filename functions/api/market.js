@@ -181,16 +181,30 @@ async function getSbiGoldEtfInav() {
 /* ---------------- helpers ---------------- */
 
 async function fetchJson(url) {
-  const r = await fetch(url);
+  const r = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "application/json,text/plain,*/*",
+      "Cache-Control": "no-cache"
+    }
+  });
+
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return await r.json();
 }
 
 async function fetchCsv(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const text = await r.text();
+  const r = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "text/csv,text/plain,*/*",
+      "Cache-Control": "no-cache"
+    }
+  });
 
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+
+  const text = await r.text();
   const lines = text.trim().split("\n");
   const headers = lines[0].split(",");
 
