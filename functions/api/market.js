@@ -75,7 +75,37 @@ function num(v) {
 function round2(v) {
   return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
+function computeRsi14(closes) {
+  const period = 14;
+  if (!Array.isArray(closes) || closes.length < period + 1) return null;
 
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change >= 0) gains += change;
+    else losses += Math.abs(change);
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+    const gain = change > 0 ? change : 0;
+    const loss = change < 0 ? Math.abs(change) : 0;
+
+    avgGain = ((avgGain * (period - 1)) + gain) / period;
+    avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+  }
+
+  if (avgLoss === 0) return 100;
+
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  return Math.round(rsi * 10) / 10;
+}
 /* ---------------- DXY ---------------- */
 
 async function getDxy() {
