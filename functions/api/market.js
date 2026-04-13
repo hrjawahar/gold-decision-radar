@@ -137,19 +137,52 @@ async function getRealYield() {
   const year = new Date().getUTCFullYear();
   const url = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_real_yield_curve`;
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Treasury fetch failed");
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+      "Accept": "text/csv,text/plain,*/*",
+      "Cache-Control": "no-cache"
+    }
+  });
+
+  if (!res.ok) throw new Error(`Treasury fetch failed: HTTP ${res.status}`);
 
   const text = await res.text();
-  const lines = text.trim().split("\n");
-  const header = lines[0].split(",");
+  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) throw new Error("Treasury CSV too short");
 
-  const idx = header.findIndex(h => /10\s*Yr/i.test(h));
-  const last = lines.at(-1).split(",");
+  const header = lines[0].split(",");
+  const dateIdx = header.findIndex(h => /^date$/i.test(h.trim()));
+  const tenIdx = header.findIndex(h => /10\s*yr/i.test(h.trim()));
+
+  if (dateIdx === -1 || tenIdx === -1) {
+    throw new Error("Treasury CSV header missing Date or 10 Yr");
+  }
+
+  let latestDate = null;
+  let latestValue = null;
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",");
+    const rawDate = cols[dateIdx]?.trim();
+    const rawVal = cols[tenIdx]?.trim();
+
+    if (!rawDate || !rawVal || rawVal === "N/A") continue;
+
+    const value = Number(rawVal);
+    if (!Number.isFinite(value)) continue;
+
+    latestDate = normalizeUsDate(rawDate);
+    latestValue = value;
+  }
+
+  if (!latestDate || latestValue === null) {
+    throw new Error("No valid Treasury 10Y real yield rows found");
+  }
 
   return {
-    value: Number(last[idx]),
-    asOf: last[0]
+    value: latestValue,
+    asOf: latestDate
   };
 }
 
