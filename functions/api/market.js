@@ -170,7 +170,24 @@ async function getSetfGoldTrend(symbol) {
 /* ---------------- RSI ---------------- */
 
 async function getRsi14(symbol) {
-  return { value: null }; // keep lightweight
+  const j = await fetchJson(
+    "https://query1.finance.yahoo.com/v8/finance/chart/SETFGOLD.NS?range=3mo&interval=1d"
+  );
+
+  const closes =
+    j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close
+      ?.filter(x => typeof x === "number" && Number.isFinite(x)) || [];
+
+  if (closes.length < 15) {
+    throw new Error("RSI insufficient close data");
+  }
+
+  const rsi = computeRsi14(closes);
+
+  return {
+    value: rsi,
+    asOf: new Date().toISOString()
+  };
 }
 
 /* ---------------- SBI iNAV (optional) ---------------- */
