@@ -75,6 +75,17 @@ function num(v) {
 function round2(v) {
   return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
+function round2(v) {
+  return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
+}
+
+// ✅ ADD HERE
+function normalizeUsDate(rawDate) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(rawDate);
+  if (!m) return rawDate;
+  const [, mm, dd, yyyy] = m;
+  return `${yyyy}-${mm}-${dd}`;
+}
 function computeRsi14(closes) {
   const period = 14;
   if (!Array.isArray(closes) || closes.length < period + 1) return null;
