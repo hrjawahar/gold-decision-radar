@@ -103,8 +103,7 @@ function computeRsi14(closes) {
   if (avgLoss === 0) return 100;
 
   const rs = avgGain / avgLoss;
-  const rsi = 100 - (100 / (1 + rs));
-  return Math.round(rsi * 10) / 10;
+  return Math.round((100 - (100 / (1 + rs))) * 10) / 10;
 }
 /* ---------------- DXY ---------------- */
 
@@ -201,25 +200,39 @@ async function getSetfGoldTrend(symbol) {
 
 async function getRsi14(symbol) {
   const j = await fetchJson(
-    "https://query1.finance.yahoo.com/v8/finance/chart/SETFGOLD.NS?range=3mo&interval=1d"
+    "https://query1.finance.yahoo.com/v8/finance/chart/SETFGOLD.NS?range=6mo&interval=1d"
   );
 
-  const closes =
-    j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close
-      ?.filter(x => typeof x === "number" && Number.isFinite(x)) || [];
+  const result = j?.chart?.result?.[0];
+  if (!result) throw new Error("RSI parse failed");
+
+  const meta = result.meta || {};
+
+  const closesRaw =
+    result?.indicators?.adjclose?.[0]?.adjclose ||
+    result?.indicators?.quote?.[0]?.close ||
+    [];
+
+  const closes = closesRaw.filter(x => typeof x === "number" && Number.isFinite(x));
 
   if (closes.length < 15) {
     throw new Error("RSI insufficient close data");
+  }
+
+  // Use live market price as last point when available
+  if (Number.isFinite(meta.regularMarketPrice) && closes.length > 0) {
+    closes[closes.length - 1] = meta.regularMarketPrice;
   }
 
   const rsi = computeRsi14(closes);
 
   return {
     value: rsi,
-    asOf: new Date().toISOString()
+    asOf: meta?.regularMarketTime
+      ? new Date(meta.regularMarketTime * 1000).toISOString()
+      : new Date().toISOString()
   };
 }
-
 /* ---------------- SBI iNAV (optional) ---------------- */
 
 async function getSbiGoldEtfInav() {
