@@ -213,9 +213,6 @@ async function getRealYield() {
     throw new Error("Treasury CSV header missing Date or 10 Yr");
   }
 
-  let latestDate = null;
-  let latestValue = null;
-
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(",");
     const rawDate = cols[dateIdx]?.trim();
@@ -226,20 +223,15 @@ async function getRealYield() {
     const value = Number(rawVal);
     if (!Number.isFinite(value)) continue;
 
-    latestDate = normalizeUsDate(rawDate);
-    latestValue = value;
+    return {
+      value,
+      asOf: normalizeUsDate(rawDate)
+    };
   }
 
-  if (!latestDate || latestValue === null) {
-    throw new Error("No valid Treasury 10Y real yield rows found");
-  }
-
-  return {
-    value: latestValue,
-    asOf: latestDate
-  };
+  throw new Error("No valid Treasury 10Y real yield rows found");
 }
-
+ 
 /* ---------------- SETFGOLD ---------------- */
 
 async function getSetfGoldTrend(symbol) {
