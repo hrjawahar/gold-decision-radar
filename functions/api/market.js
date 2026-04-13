@@ -3,13 +3,43 @@ export async function onRequestGet() {
   const errors = [];
 
   const dxyObj = await tryFetch("dxy", getDxy, { value: null }, errors);
-  const inrObj = await tryFetch("usdInr", getUsdInr, { value: null, pct30d: null, trend: "stable" }, errors);
-  const realYieldObj = await tryFetch("realYield", getRealYield, { value: null, asOf: null }, errors);
-  const goldTrendObj = await tryFetch("setfGold", () => getSetfGoldTrend("setfgold.ns"), {
-    value: null, asOf: null, prevClose: null, changePct1d: null, changePct5d: null, trend: "flat"
-  }, errors);
-  const rsiObj = await tryFetch("rsi14Setfgold", () => getRsi14("setfgold.ns"), { value: null, asOf: null }, errors);
-  const sbiInavObj = await tryFetch("sbiInav", getSbiGoldEtfInav, { value: null, asOf: null }, errors);
+  const inrObj = await tryFetch(
+    "usdInr",
+    getUsdInr,
+    { value: null, pct30d: null, trend: "stable" },
+    errors
+  );
+  const realYieldObj = await tryFetch(
+    "realYield",
+    getRealYield,
+    { value: null, asOf: null },
+    errors
+  );
+  const goldTrendObj = await tryFetch(
+    "setfGold",
+    () => getSetfGoldTrend("SETFGOLD.NS"),
+    {
+      value: null,
+      asOf: null,
+      prevClose: null,
+      changePct1d: null,
+      changePct5d: null,
+      trend: "flat"
+    },
+    errors
+  );
+  const rsiObj = await tryFetch(
+    "rsi14Setfgold",
+    () => getRsi14("SETFGOLD.NS"),
+    { value: null, asOf: null },
+    errors
+  );
+  const sbiInavObj = await tryFetch(
+    "sbiInav",
+    getSbiGoldEtfInav,
+    { value: null, asOf: null },
+    errors
+  );
 
   const domesticPremiumPct =
     num(goldTrendObj?.value) !== null &&
@@ -51,7 +81,7 @@ export async function onRequestGet() {
   return new Response(JSON.stringify(result, null, 2), {
     status: 200,
     headers: {
-      "content-type": "application/json",
+      "content-type": "application/json; charset=utf-8",
       "cache-control": `public, max-age=${cacheSeconds}`
     }
   });
@@ -63,29 +93,26 @@ async function tryFetch(name, fn, fallback, errors) {
   try {
     return await fn();
   } catch (e) {
-    errors.push(`${name}: ${String(e.message || e)}`);
+    errors.push(`${name}: ${String(e?.message || e)}`);
     return fallback;
   }
 }
 
 function num(v) {
-  return (typeof v === "number" && Number.isFinite(v)) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
 function round2(v) {
   return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
 }
-function round2(v) {
-  return Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
-}
 
-// ✅ ADD HERE
 function normalizeUsDate(rawDate) {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(rawDate);
   if (!m) return rawDate;
   const [, mm, dd, yyyy] = m;
   return `${yyyy}-${mm}-${dd}`;
 }
+
 function computeRsi14(closes) {
   const period = 14;
   if (!Array.isArray(closes) || closes.length < period + 1) return null;
@@ -96,26 +123,33 @@ function computeRsi14(closes) {
   }
 
   const last14 = changes.slice(-period);
-  const gains = last14.filter(x => x > 0).reduce((a, b) => a + b, 0) / period;
-  const losses = Math.abs(last14.filter(x => x < 0).reduce((a, b) => a + b, 0)) / period;
+  const gains =
+    last14.filter(x => x > 0).reduce((a, b) => a + b, 0) / period;
+  const losses =
+    Math.abs(last14.filter(x => x < 0).reduce((a, b) => a + b, 0)) / period;
 
   if (losses === 0) return 100;
 
   const rs = gains / losses;
   return Math.round((100 - (100 / (1 + rs))) * 10) / 10;
-}  
+}
+
 /* ---------------- DXY ---------------- */
 
 async function getDxy() {
-  // Stooq first
   const s = await fetchCsv("https://stooq.com/q/d/l/?s=dx.f&i=d");
   const last = Number(s.at(-1)?.close);
-  if (Number.isFinite(last)) return { value: last };
+  if (Number.isFinite(last)) {
+    return { value: last };
+  }
 
-  // fallback yahoo
-  const j = await fetchJson("https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB");
+  const j = await fetchJson(
+    "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB"
+  );
   const val = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
-  if (!Number.isFinite(val)) throw new Error("DXY unavailable");
+  if (!Number.isFinite(val)) {
+    throw new Error("DXY unavailable");
+  }
   return { value: val };
 }
 
@@ -127,26 +161,31 @@ async function getUsdInr() {
   );
 
   const closes =
-    j.chart.result[0].indicators.quote[0].close
-      .filter(x => typeof x === "number");
+    j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close
+      ?.filter(x => typeof x === "number" && Number.isFinite(x)) || [];
+
+  if (closes.length < 22) {
+    throw new Error("USDINR insufficient close data");
+  }
 
   const latest = closes.at(-1);
   const ref30 = closes.at(-22);
-
   const pct = ((latest - ref30) / ref30) * 100;
 
   return {
     value: latest,
     pct30d: round2(pct),
-    trend: pct > 0.5 ? "weakening" :
-           pct < -0.5 ? "strengthening" : "stable"
+    trend: pct > 0.5 ? "weakening" : pct < -0.5 ? "strengthening" : "stable"
   };
 }
+
 /* ---------------- REAL YIELD ---------------- */
 
 async function getRealYield() {
   const year = new Date().getUTCFullYear();
-  const url = `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_real_yield_curve`;
+  const url =
+    `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/` +
+    `daily-treasury-rates.csv/${year}/all?type=daily_treasury_real_yield_curve`;
 
   const res = await fetch(url, {
     headers: {
@@ -156,11 +195,15 @@ async function getRealYield() {
     }
   });
 
-  if (!res.ok) throw new Error(`Treasury fetch failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Treasury fetch failed: HTTP ${res.status}`);
+  }
 
   const text = await res.text();
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) throw new Error("Treasury CSV too short");
+  if (lines.length < 2) {
+    throw new Error("Treasury CSV too short");
+  }
 
   const header = lines[0].split(",");
   const dateIdx = header.findIndex(h => /^date$/i.test(h.trim()));
@@ -201,12 +244,16 @@ async function getRealYield() {
 
 async function getSetfGoldTrend(symbol) {
   const j = await fetchJson(
-    "https://query1.finance.yahoo.com/v8/finance/chart/SETFGOLD.NS?range=1mo&interval=1d"
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1d`
   );
 
   const closes =
-    j.chart.result[0].indicators.quote[0].close
-      .filter(x => typeof x === "number");
+    j?.chart?.result?.[0]?.indicators?.quote?.[0]?.close
+      ?.filter(x => typeof x === "number" && Number.isFinite(x)) || [];
+
+  if (closes.length < 6) {
+    throw new Error("SETFGOLD insufficient close data");
+  }
 
   const latest = closes.at(-1);
   const prev = closes.at(-2);
@@ -228,15 +275,18 @@ async function getSetfGoldTrend(symbol) {
     asOf: new Date().toISOString()
   };
 }
+
 /* ---------------- RSI ---------------- */
 
 async function getRsi14(symbol) {
   const j = await fetchJson(
-    "https://query1.finance.yahoo.com/v8/finance/chart/SETFGOLD.NS?range=6mo&interval=1d"
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=6mo&interval=1d`
   );
 
   const result = j?.chart?.result?.[0];
-  if (!result) throw new Error("RSI parse failed");
+  if (!result) {
+    throw new Error("RSI parse failed");
+  }
 
   const meta = result.meta || {};
 
@@ -251,7 +301,6 @@ async function getRsi14(symbol) {
     throw new Error("RSI insufficient close data");
   }
 
-  // Use live market price as last point when available
   if (Number.isFinite(meta.regularMarketPrice) && closes.length > 0) {
     closes[closes.length - 1] = meta.regularMarketPrice;
   }
@@ -265,15 +314,24 @@ async function getRsi14(symbol) {
       : new Date().toISOString()
   };
 }
+
 /* ---------------- SBI iNAV (optional) ---------------- */
 
 async function getSbiGoldEtfInav() {
   const res = await fetch("https://etf.sbimf.com/home/GetETFNAVDetailsAsync");
   const text = await res.text();
-  if (text.startsWith("<")) throw new Error("SBI blocked");
-  const j = JSON.parse(text);
 
-  const row = j.Data.find(x => /SBI Gold ETF/i.test(x.FundName));
+  if (text.startsWith("<")) {
+    throw new Error("SBI blocked");
+  }
+
+  const j = JSON.parse(text);
+  const row = j?.Data?.find(x => /SBI Gold ETF/i.test(x.FundName));
+
+  if (!row) {
+    throw new Error("SBI Gold ETF row not found");
+  }
+
   return {
     value: Number(row.LatestNAV),
     asOf: row.LatestNAVDate
@@ -291,7 +349,10 @@ async function fetchJson(url) {
     }
   });
 
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) {
+    throw new Error(`HTTP ${r.status}`);
+  }
+
   return await r.json();
 }
 
@@ -304,7 +365,9 @@ async function fetchCsv(url) {
     }
   });
 
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) {
+    throw new Error(`HTTP ${r.status}`);
+  }
 
   const text = await r.text();
   const lines = text.trim().split("\n");
@@ -313,7 +376,9 @@ async function fetchCsv(url) {
   return lines.slice(1).map(line => {
     const parts = line.split(",");
     const obj = {};
-    headers.forEach((h,i)=>obj[h.trim().toLowerCase()]=parts[i]);
+    headers.forEach((h, i) => {
+      obj[h.trim().toLowerCase()] = parts[i];
+    });
     return obj;
   });
 }
